@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="hu" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Easter Mind Map MCP — Fejlesztési Terv (Report)</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --surface:#ffffff; --surface-2:#f1f3f7; --surface-3:#e9edf3;
+    --text:#161a22; --muted:#5b6573; --border:#e2e6ec;
+    --accent:#5b5bd6; --accent-soft:#ecebfb; --accent-2:#0d9488; --accent-2-soft:#d7f3ee;
+    --ok:#16a34a; --ok-soft:#dcfce7; --warn:#b45309; --warn-soft:#fef3c7; --danger:#dc2626; --danger-soft:#fee2e2;
+    --code-bg:#0c1020; --code-text:#d8e0f0; --code-comment:#7d8bb0; --code-key:#8ab4ff; --code-str:#7ee0b8;
+    --shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.06);
+    --radius:14px; --maxw:980px;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --mono:'JetBrains Mono','SFMono-Regular',ui-monospace,Menlo,Consolas,monospace;
+  }
+  html[data-theme="dark"]{
+    --bg:#0a0d13; --surface:#11151d; --surface-2:#161b24; --surface-3:#1c222d;
+    --text:#e7ebf2; --muted:#98a3b3; --border:#242c39;
+    --accent:#8b8bf0; --accent-soft:#1d1f3a; --accent-2:#2dd4bf; --accent-2-soft:#10312c;
+    --ok:#34d399; --ok-soft:#0f2e22; --warn:#fbbf24; --warn-soft:#3a2c08; --danger:#f87171; --danger-soft:#3a1414;
+    --code-bg:#070a12; --code-text:#d8e0f0; --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.6;-webkit-font-smoothing:antialiased;font-size:15.5px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:var(--mono);font-size:.86em;background:var(--surface-3);padding:.1em .4em;border-radius:6px}
+  pre{margin:0}
+  pre code{display:block;background:var(--code-bg);color:var(--code-text);padding:16px 18px;border-radius:12px;overflow-x:auto;font-size:13px;line-height:1.65;border:1px solid rgba(255,255,255,.05)}
+  .cmt{color:var(--code-comment)}
+
+  /* layout */
+  .app{display:grid;grid-template-columns:288px 1fr;min-height:100vh}
+  .sidebar{position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:22px 16px 40px}
+  .brand{display:flex;gap:11px;align-items:center;padding:6px 10px 16px}
+  .brand .logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));flex:0 0 auto;display:grid;place-items:center;color:#fff;font-weight:800;font-size:18px;box-shadow:var(--shadow)}
+  .brand b{font-size:14.5px;letter-spacing:.2px;display:block}
+  .brand span{font-size:11.5px;color:var(--muted)}
+  .nav-group{margin:14px 6px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.10em;color:var(--muted);font-weight:700}
+  .nav a{display:flex;gap:10px;align-items:center;padding:8px 11px;border-radius:9px;color:var(--text);font-size:13.6px;font-weight:500;cursor:pointer;border:1px solid transparent}
+  .nav a .ix{color:var(--muted);font-family:var(--mono);font-size:11.5px;min-width:18px}
+  .nav a:hover{background:var(--surface-2);text-decoration:none}
+  .nav a.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  .nav a.active .ix{color:var(--accent)}
+
+  .main{min-width:0}
+  .topbar{position:sticky;top:0;z-index:20;backdrop-filter:saturate(1.4) blur(8px);background:color-mix(in srgb,var(--bg) 78%,transparent);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:12px 28px}
+  .topbar .crumb{font-size:12.5px;color:var(--muted)}
+  .topbar .crumb b{color:var(--text)}
+  .tb-actions{display:flex;gap:8px;align-items:center}
+  .btn{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--text);padding:7px 12px;border-radius:9px;cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+  .btn:hover{background:var(--surface-2)}
+
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:34px 28px 90px}
+  .page{display:none;animation:fade .25s ease}
+  .page.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:5px 11px;border-radius:999px}
+  h1{font-size:30px;line-height:1.2;margin:14px 0 8px;letter-spacing:-.4px}
+  h2{font-size:21px;margin:34px 0 12px;letter-spacing:-.2px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+  h3{font-size:16px;margin:22px 0 8px}
+  p{margin:11px 0}
+  .lead{font-size:16.5px;color:var(--muted);margin:6px 0 18px}
+  ul,ol{margin:11px 0;padding-left:22px}
+  li{margin:5px 0}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:880px){.g2,.g3{grid-template-columns:1fr}}
+
+  .callout{border:1px solid var(--border);border-left:4px solid var(--accent);background:var(--surface);border-radius:10px;padding:13px 16px;margin:16px 0;font-size:14px}
+  .callout.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+  .callout.ok{border-left-color:var(--ok);background:var(--ok-soft)}
+  .callout.info{border-left-color:var(--accent-2);background:var(--accent-2-soft)}
+  .callout b{display:block;margin-bottom:3px}
+
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:7px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+  .badge.ac{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+  .badge.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+  .badge.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:14px 0;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{background:var(--surface-2);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+  tr:last-child td{border-bottom:none}
+  td code{font-size:12px}
+  .mono{font-family:var(--mono)}
+
+  .agent-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:15px 16px;box-shadow:var(--shadow)}
+  .agent-card .tag{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:3px 8px;border-radius:6px}
+  .agent-card h4{margin:9px 0 4px;font-size:14.5px}
+  .agent-card p{margin:4px 0;font-size:12.8px;color:var(--muted)}
+
+  .phase{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--border)}
+  .phase:last-child{border-bottom:none}
+  .phase .pn{flex:0 0 auto;width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-weight:800;display:grid;place-items:center;font-size:14px}
+  .phase .pb{flex:1}
+  .phase h4{margin:0 0 3px;font-size:15px}
+  .phase .meta{font-size:12px;color:var(--muted)}
+  .gate{font-size:12px;margin-top:5px;color:var(--ok);font-weight:600}
+
+  .pager{display:flex;justify-content:space-between;gap:12px;margin-top:40px;padding-top:20px;border-top:1px solid var(--border)}
+  .pager a{flex:1;border:1px solid var(--border);border-radius:12px;padding:12px 15px;background:var(--surface);cursor:pointer;color:var(--text)}
+  .pager a:hover{background:var(--surface-2);text-decoration:none}
+  .pager a.next{text-align:right}
+  .pager .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+  .pager .t{font-weight:600;font-size:14px}
+  .pager a.disabled{opacity:.4;pointer-events:none}
+
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:13.5px}
+  .kv dt{color:var(--muted);font-weight:600}
+  .kv dd{margin:0}
+
+  svg .slab{font:600 12px var(--font);fill:var(--text)}
+  svg .ssub{font:500 10.5px var(--mono);fill:var(--muted)}
+  svg .sbox{fill:var(--surface);stroke:var(--border)}
+  svg .sacc{fill:var(--accent-soft);stroke:var(--accent)}
+  svg .sup{fill:var(--accent-2-soft);stroke:var(--accent-2)}
+  svg .sln{stroke:var(--muted);stroke-width:1.5;fill:none}
+
+  .foot{color:var(--muted);font-size:12px;margin-top:30px;text-align:center}
+
+  @media print{
+    .sidebar,.topbar,.pager{display:none!important}
+    .app{display:block}
+    .page{display:block!important;page-break-after:always}
+    .wrap{max-width:none}
+    body{font-size:11pt}
+  }
+  @media(max-width:760px){
+    .app{grid-template-columns:1fr}
+    .sidebar{position:fixed;left:-300px;transition:left .2s;z-index:50}
+    .sidebar.open{left:0}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo">E</div>
+      <div><b>Easter Mind Map MCP</b><span>Fejlesztési terv · v1 · 2026‑06‑26</span></div>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="nav-group">Áttekintés</div>
+      <a data-go="p-overview"><span class="ix">01</span> Küldetés &amp; összefoglaló</a>
+      <a data-go="p-contract"><span class="ix">02</span> Upstream kontraktus</a>
+      <a data-go="p-arch"><span class="ix">03</span> Cél‑architektúra</a>
+      <div class="nav-group">Megvalósítás</div>
+      <a data-go="p-team"><span class="ix">04</span> Agent‑csapat</a>
+      <a data-go="p-phases"><span class="ix">05</span> Fázisterv (DAG)</a>
+      <a data-go="p-tools"><span class="ix">06</span> MCP toolok</a>
+      <a data-go="p-state"><span class="ix">07</span> State &amp; konkurrencia</a>
+      <a data-go="p-export"><span class="ix">08</span> Export, flow, biztonság</a>
+      <a data-go="p-upstream"><span class="ix">09</span> Upstream módosítások</a>
+      <a data-go="p-tooling"><span class="ix">10</span> Eszközlánc &amp; QA</a>
+      <div class="nav-group">Zárás</div>
+      <a data-go="p-accept"><span class="ix">11</span> Elfogadási kritériumok</a>
+      <a data-go="p-trace"><span class="ix">12</span> Traceability mátrix</a>
+      <a data-go="p-verify"><span class="ix">13</span> Verifikáció &amp; források</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="crumb">Terv‑report · <b id="crumb">Küldetés &amp; összefoglaló</b></div>
+      <div class="tb-actions">
+        <button class="btn" onclick="window.print()">⤓ Nyomtatás / PDF</button>
+        <button class="btn" id="themeBtn">◐ Téma</button>
+      </div>
+    </div>
+    <div class="wrap">
+
+    <!-- ============ 01 OVERVIEW ============ -->
+    <section class="page active" id="p-overview">
+      <span class="eyebrow">Terv‑report · multi‑agent</span>
+      <h1>Easter Mind Map MCP — headless, párhuzamos mind‑map tervezés</h1>
+      <p class="lead">Egy TypeScript/Bun alapú MCP szerver, amely kizárólagos integrációs rétegként a MindGeniusAI HTTP/SSE backendje elé épül. Ez a report a fejlesztő agent‑csapatnak szóló terv vizuális összefoglalója; a teljes, átadható terv‑prompt a kísérő markdown fájl.</p>
+
+      <div class="badges">
+        <span class="badge ac">Bun + TypeScript 6</span>
+        <span class="badge ac">MCP 2025‑11‑25 (RC‑forward 2026‑07‑28)</span>
+        <span class="badge ac">MCP TS SDK v1.x</span>
+        <span class="badge">Prettier · ESLint · Lefthook</span>
+        <span class="badge ok">Valós kódból verifikálva</span>
+      </div>
+
+      <div class="grid g3" style="margin-top:18px">
+        <div class="card"><h3 style="margin-top:0">Mit építünk</h3><p style="font-size:13.5px;color:var(--muted)">Stateful MCP adapter + job‑orchestrátor egy stateless generáló engine fölé: tartós <code>planningId</code>, queue, concurrency, SSE‑reducer, export.</p></div>
+        <div class="card"><h3 style="margin-top:0">Miért MCP</h3><p style="font-size:13.5px;color:var(--muted)">Az LLM ne hívja közvetlenül a backendet. Minden művelet MCP toolon/resource‑on át — a tool‑szövegezés maga is prompt.</p></div>
+        <div class="card"><h3 style="margin-top:0">Hogyan</h3><p style="font-size:13.5px;color:var(--muted)">10 specializált agent, 6 fázis, explicit kapuk, web‑verifikált stack és független teljesség‑ellenőrzés.</p></div>
+      </div>
+
+      <h2>A hozzáadott érték a stateless engine fölé</h2>
+      <pre><code>MCP tool interfész
++ explicit, tartós planningId / runId / documentId
++ perzisztens állapot (terv, run, esemény, dokumentum)
++ job queue + concurrency limit (global / owner / plan)
++ MindGeniusAI SSE feldolgozás + mind‑map state reducer
++ dokumentum‑koordináció (upload + RAG index)
++ cancellation + retry + idempotencia
++ OPML / PNG export + AI‑olvasható flow‑leírás
++ biztonság (ownership, OAuth, SSRF, quota)
++ upstream felügyelet (health‑check + auto‑start)</code></pre>
+
+      <div class="callout info"><b>A forrás‑mind map két különálló scope‑ra bomlik</b>
+      (1) az új <b>MCP adapter szerver</b> (Bun/TS6, a mi kódunk), és (2) az <b>./original‑MindGeniusAI</b> upstream repón végzett <b>módosítások</b> (MiniMax provider + Claude Code CLI tmux‑szal). A kettő külön kódbázis — nem keverjük.</div>
+
+      <div class="pager"><a class="disabled"></a><a class="next" data-go="p-contract"><span class="k">Következő</span><div class="t">Upstream kontraktus →</div></a></div>
+    </section>
+
+    <!-- ============ 02 CONTRACT ============ -->
+    <section class="page" id="p-contract">
+      <span class="eyebrow">02 · Igazolt valóság</span>
+      <h1>Upstream kontraktus — a MindGeniusAI valós állapota</h1>
+      <p class="lead">Ezt nem a spec‑tervezetből vettük, hanem a <b>valós forráskódból</b> fejtettük vissza. A Reverse‑Engineering agent első dolga visszaigazolni a friss <code>main</code>‑ből.</p>
+
+      <div class="callout warn"><b>A spec‑tervezet több ponton eltér a valóságtól</b>
+      A backend <b>Hono + Node + pnpm</b> (nem Express/Fastify, nem Bun); a <code>GET /api/health</code> endpoint <b>már létezik</b>; a providerek <b>OpenAI / Anthropic / DeepSeek / Moonshot</b> — <b>MiniMax még nincs</b>. Ahol a tervezet és a kód ütközik, a kód az irányadó.</p></div>
+
+      <div class="grid g2">
+        <div class="card">
+          <h3 style="margin-top:0">Repo &amp; stack</h3>
+          <dl class="kv">
+            <dt>Repo</dt><dd><code>xianjianlf2/MindGeniusAI</code> · MIT · <code>main</code></dd>
+            <dt>Monorepo</dt><dd>pnpm workspaces</dd>
+            <dt>web</dt><dd>React 18 + Vite + Zustand 5 + AntV X6</dd>
+            <dt>server</dt><dd>Hono · Node ≥ 20 · tsx · pino</dd>
+            <dt>shared</dt><dd>protokoll + mind‑map limitek</dd>
+            <dt>LLM</dt><dd>Vercel AI SDK v5</dd>
+            <dt>Health</dt><dd><code>GET /api/health → {ok:true}</code> ✅ létezik</dd>
+          </dl>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">RAG / dokumentum folyamat</h3>
+          <p style="font-size:13.3px;color:var(--muted);margin-top:0">In‑process memória index (<code>Map&lt;fileName, chunks&gt;</code>), <b>nem perzisztens</b>, instance‑hez kötött.</p>
+          <pre><code><span class="cmt"># 1) feltöltés (multipart, csak PDF, ≤10MB)</span>
+POST /api/uploadFile      → { fileName }
+<span class="cmt"># 2) indexelés (pdf‑parse → chunk → embedMany)</span>
+POST /api/document/init   { fileName }
+<span class="cmt"># 3) a fileName-t átadva a /api/agent-ben</span>
+<span class="cmt">#    működik a rag_query tool</span></code></pre>
+          <p style="font-size:12.5px;color:var(--muted)">Idempotens a <code>fileName</code>‑re; LRU eviction 20 felett; nincs cross‑name dedup.</p>
+        </div>
+      </div>
+
+      <h2>A fő endpoint: <code>POST /api/agent</code></h2>
+      <p>zod‑validált kérés, kérésenként <b>egyszer</b> fut a <code>runHermas(...)</code> (AI SDK <code>streamText</code>, <code>MAX_STEPS=8</code>), és külön SSE választ ad.</p>
+      <pre><code>type AgentRequest = {
+  messages: Array&lt;{ role:'user'|'assistant'|'system'; content:string }&gt;; <span class="cmt">// .min(1)</span>
+  fileName?: string;          <span class="cmt">// korábban feltöltött + indexelt PDF (rag_query)</span>
+  mindMap?: MindMapOutline;   <span class="cmt">// a canvas aktuális outline-ja { id, label, children? }</span>
+};</code></pre>
+
+      <h2>SSE wire‑formátum + AgentEvent</h2>
+      <div class="grid g2">
+        <div>
+          <pre><code><span class="cmt">// minden SSE data: sor egy envelope</span>
+interface SseEnvelope {
+  status: 'pending'|'done'|'failed';
+  data?: string;
+}
+<span class="cmt">// a struktúrált esemény a pending.data-ban,</span>
+<span class="cmt">// 'agent:' prefixszel kódolva:</span>
+<span class="cmt">// data === 'agent:' + JSON.stringify(event)</span></code></pre>
+        </div>
+        <div>
+          <table style="margin-top:0">
+            <tr><th>AgentEvent</th><th>mező</th></tr>
+            <tr><td><code>text</code></td><td>delta</td></tr>
+            <tr><td><code>tool-call</code></td><td>toolName, toolCallId, input</td></tr>
+            <tr><td><code>tool-result</code></td><td>toolName, toolCallId, output</td></tr>
+            <tr><td><code>mindmap-patch</code> <span class="badge warn">szintetikus</span></td><td>ops[]</td></tr>
+            <tr><td><code>mindmap-set</code> <span class="badge warn">szintetikus</span></td><td>markdown</td></tr>
+            <tr><td><code>step-finish</code></td><td>–</td></tr>
+            <tr><td><code>error</code></td><td>message</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="callout"><b>Kulcs‑részlet a reducerhez</b>
+      A <code>mindmap-set</code> / <code>mindmap-patch</code> a szerver által <b>injektált, determinisztikus</b> esemény — nem kell markdownt kikaparni a chat‑szövegből. A <code>mindmap-set</code> markdownját ugyanazzal a <b>shared parserrel</b> (<code>apps/web/src/utils/convertMarkdown.ts</code>) kell outline‑ná alakítani, amit a webapp használ. Ezt portolni kell az MCP szerverbe.</div>
+
+      <div class="pager"><a data-go="p-overview"><span class="k">Előző</span><div class="t">← Áttekintés</div></a><a class="next" data-go="p-arch"><span class="k">Következő</span><div class="t">Cél‑architektúra →</div></a></div>
+    </section>
+
+    <!-- ============ 03 ARCH ============ -->
+    <section class="page" id="p-arch">
+      <span class="eyebrow">03 · Architektúra</span>
+      <h1>Cél‑architektúra — az MCP adapter</h1>
+      <p class="lead">Az MCP szerver adapterként épül a változatlan MindGeniusAI elé. Az MCP transport session és az üzleti <code>planningId</code> két külön fogalom.</p>
+
+      <div class="card" style="padding:10px 8px">
+      <svg viewBox="0 0 860 470" width="100%" role="img" aria-label="Architektúra diagram">
+        <!-- host -->
+        <rect class="sacc" x="300" y="14" width="260" height="48" rx="10"/>
+        <text class="slab" x="430" y="35" text-anchor="middle">MCP host / LLM</text>
+        <text class="ssub" x="430" y="51" text-anchor="middle">Hermes · Claude Code · ...</text>
+        <path class="sln" d="M430 62 L430 92" marker-end="url(#ar)"/>
+        <text class="ssub" x="446" y="82">MCP tools + resources (stdio / HTTP)</text>
+
+        <!-- MCP server big box -->
+        <rect class="sbox" x="40" y="96" width="780" height="266" rx="14"/>
+        <text class="slab" x="60" y="120">Easter Mind Map MCP Server</text>
+        <text class="ssub" x="60" y="136">Bun · TypeScript 6 · MCP TS SDK v1.x</text>
+
+        <!-- inner modules -->
+        <g>
+          <rect class="sbox" x="60" y="150" width="220" height="44" rx="9"/><text class="ssub" x="72" y="170">Transport</text><text class="ssub" x="72" y="184">stdio · Streamable HTTP + OAuth</text>
+          <rect class="sbox" x="300" y="150" width="220" height="44" rx="9"/><text class="ssub" x="312" y="170">Tool handlerek</text><text class="ssub" x="312" y="184">a "generáló endpointok"</text>
+          <rect class="sbox" x="540" y="150" width="260" height="44" rx="9"/><text class="ssub" x="552" y="170">Resource szolgáltató</text><text class="ssub" x="552" y="184">plans · events · exports · guide</text>
+
+          <rect class="sbox" x="60" y="204" width="220" height="44" rx="9"/><text class="ssub" x="72" y="224">Planning / Run / Doc service</text><text class="ssub" x="72" y="238">idempotencia · verziózás</text>
+          <rect class="sbox" x="300" y="204" width="220" height="44" rx="9"/><text class="ssub" x="312" y="224">Queue + concurrency</text><text class="ssub" x="312" y="238">global / owner / plan=1</text>
+          <rect class="sbox" x="540" y="204" width="260" height="44" rx="9"/><text class="ssub" x="552" y="224">Mind‑map state reducer</text><text class="ssub" x="552" y="238">shared parser újrahasznosítva</text>
+
+          <rect class="sacc" x="60" y="258" width="220" height="44" rx="9"/><text class="ssub" x="72" y="278" style="fill:var(--accent)">Upstream SSE kliens</text><text class="ssub" x="72" y="292" style="fill:var(--accent)">AbortController · no‑leak</text>
+          <rect class="sacc" x="300" y="258" width="220" height="44" rx="9"/><text class="ssub" x="312" y="278" style="fill:var(--accent)">Upstream supervisor</text><text class="ssub" x="312" y="292" style="fill:var(--accent)">health‑check + auto‑start</text>
+          <rect class="sbox" x="540" y="258" width="260" height="44" rx="9"/><text class="ssub" x="552" y="278">Security · Export motor</text><text class="ssub" x="552" y="292">ownership · OPML/PNG</text>
+
+          <rect class="sbox" x="60" y="312" width="740" height="38" rx="9"/><text class="ssub" x="72" y="335">Persistent store: PostgreSQL  ·  Queue backend: pg‑boss / BullMQ  ·  Objektumtároló: dokumentumok</text>
+        </g>
+
+        <path class="sln" d="M430 362 L430 398" marker-end="url(#ar)"/>
+        <text class="ssub" x="446" y="386">HTTP + SSE</text>
+
+        <!-- upstream -->
+        <rect class="sup" x="170" y="402" width="520" height="54" rx="12"/>
+        <text class="slab" x="430" y="424" text-anchor="middle">MindGeniusAI server (Hono · Node) — VÁLTOZATLAN</text>
+        <text class="ssub" x="430" y="442" text-anchor="middle">POST /api/agent · /api/uploadFile · /api/document/init · GET /api/health</text>
+
+        <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="var(--muted)" stroke-width="1.5"/></marker></defs>
+      </svg>
+      </div>
+
+      <div class="callout ok"><b>Tervezési invariáns</b>
+      Az állapot soha nem kötődik a transport session‑höz; minden állapotfüggő tool explicit <code>planningId</code>‑t kap. Az MCP szerver nem módosítja a MindGeniusAI generáló forráskódját (kivéve a külön scope‑ú upstream módosításokat).</div>
+
+      <div class="pager"><a data-go="p-contract"><span class="k">Előző</span><div class="t">← Upstream kontraktus</div></a><a class="next" data-go="p-team"><span class="k">Következő</span><div class="t">Agent‑csapat →</div></a></div>
+    </section>
+
+    <!-- ============ 04 TEAM ============ -->
+    <section class="page" id="p-team">
+      <span class="eyebrow">04 · Szervezet</span>
+      <h1>Az agent‑csapat — 10 specializált szerep</h1>
+      <p class="lead">Az Orchestrátor spawnolja a subagenteket; mindegyik a megosztott <code>docs/</code> szerződéseken (UPSTREAM‑CONTRACT, MCP‑TOOLS, ADR) keresztül kommunikál.</p>
+
+      <div class="grid g2">
+        <div class="agent-card"><span class="tag">A0</span><h4>Orchestrátor / Tech Lead</h4><p>Koordináció, task graph, fázis‑kapuk, ADR‑ek, végső verifikáció.</p><p style="color:var(--accent)">→ ADR‑ek, release</p></div>
+        <div class="agent-card"><span class="tag">A1</span><h4>Reverse‑Engineering &amp; Contract</h4><p>A valós upstream visszaigazolása; server↔webapp flow precíz dokumentálása.</p><p style="color:var(--accent)">→ docs/UPSTREAM‑CONTRACT.md</p></div>
+        <div class="agent-card"><span class="tag">A2</span><h4>MCP Core &amp; Tool‑design</h4><p>Szerver‑váz, transportok, tool‑definíciók, <b>szövegezés‑mint‑prompt</b>, resource‑ok, instructions.</p><p style="color:var(--accent)">→ src/mcp/**, docs/MCP‑TOOLS.md</p></div>
+        <div class="agent-card"><span class="tag">A3</span><h4>Upstream SSE kliens &amp; reducer</h4><p>AgentRequest, SSE parse/decode, mind‑map reducer, <b>SSE no‑leak</b>, health‑check + auto‑start.</p><p style="color:var(--accent)">→ src/upstream/**, src/workers/**</p></div>
+        <div class="agent-card"><span class="tag">A4</span><h4>State, Queue &amp; Concurrency</h4><p>Perzisztencia, idempotencia, verziózás, queue, concurrency limitek, cancellation.</p><p style="color:var(--accent)">→ src/application/**, persistence, queue</p></div>
+        <div class="agent-card"><span class="tag">A5</span><h4>Export &amp; Flow</h4><p><code>mindmap_export</code> (OPML+PNG) és <code>mindmap_guide</code> flow‑endpoint/resource.</p><p style="color:var(--accent)">→ src/export/**, flow resource</p></div>
+        <div class="agent-card"><span class="tag">A6</span><h4>Security &amp; Ownership</h4><p>Ownership minden entitáson, OAuth 2.1/bearer, SSRF/path/size védelem, rate‑limit/quota, secret‑kezelés.</p><p style="color:var(--accent)">→ src/security/**</p></div>
+        <div class="agent-card"><span class="tag">A7</span><h4>Upstream Modifications</h4><p><code>./original-MindGeniusAI</code>: MiniMax provider (config‑bound) + Claude Code CLI (tmux‑only).</p><p style="color:var(--accent)">→ upstream PR‑ek</p></div>
+        <div class="agent-card"><span class="tag">A8</span><h4>DevOps / Tooling</h4><p>Bun projekt, TS6 config, Prettier, ESLint, Lefthook (pre‑commit/pre‑push), CI.</p><p style="color:var(--accent)">→ bootstrap, lefthook.yml, CI</p></div>
+        <div class="agent-card"><span class="tag">A9</span><h4>QA &amp; Verification</h4><p>Unit/integration tesztek, <b>tool‑autonómia eval</b>, acceptance, SSE‑leak audit, teljesség‑ellenőrzés.</p><p style="color:var(--accent)">→ tesztek, QA riport</p></div>
+      </div>
+
+      <div class="pager"><a data-go="p-arch"><span class="k">Előző</span><div class="t">← Cél‑architektúra</div></a><a class="next" data-go="p-phases"><span class="k">Következő</span><div class="t">Fázisterv →</div></a></div>
+    </section>
+
+    <!-- ============ 05 PHASES ============ -->
+    <section class="page" id="p-phases">
+      <span class="eyebrow">05 · Ütemezés</span>
+      <h1>Fázisterv és függőségek (DAG)</h1>
+      <p class="lead">Hat fázis, explicit belépő feltétellel és kilépő kapuval. Az F4 (upstream módosítások) külön kódbázis, ezért F1–F3 mellett párhuzamosan futhat.</p>
+
+      <div class="card">
+        <div class="phase"><div class="pn">F0</div><div class="pb"><h4>Bootstrap &amp; Contract</h4><p class="meta">A8, A1 · belépő: – </p><p style="font-size:13px;margin:6px 0 0">Repo‑váz (Bun/TS6/Prettier/ESLint/Lefthook/CI) + upstream kontraktus visszaigazolása.</p><div class="gate">▸ Kapu: UPSTREAM‑CONTRACT.md kész; <code>bun test</code> + hookok futnak</div></div></div>
+        <div class="phase"><div class="pn">F1</div><div class="pb"><h4>Upstream kliens &amp; MCP váz</h4><p class="meta">A3, A2 · belépő: F0</p><p style="font-size:13px;margin:6px 0 0">SSE kliens + reducer + health/auto‑start; MCP szerver‑váz + transportok.</p><div class="gate">▸ Kapu: valós <code>/api/agent</code> futás végig‑streamel, determinisztikus outline, nincs SSE‑leak</div></div></div>
+        <div class="phase"><div class="pn">F2</div><div class="pb"><h4>Toolok, state, konkurrencia</h4><p class="meta">A2, A4 · belépő: F1</p><p style="font-size:13px;margin:6px 0 0">Generáló toolok; perzisztencia; queue; concurrency; idempotencia; verziózás.</p><div class="gate">▸ Kapu: <code>mindmap_create</code> azonnal ad planningId‑t; párhuzamos tervek; plan‑szintű soros futás</div></div></div>
+        <div class="phase"><div class="pn">F3</div><div class="pb"><h4>Dokumentum, export, flow, security</h4><p class="meta">A4, A5, A6 · belépő: F2</p><p style="font-size:13px;margin:6px 0 0">document add/index; <code>mindmap_export</code> (OPML/PNG); <code>mindmap_guide</code>; ownership/auth/SSRF/quota.</p><div class="gate">▸ Kapu: export működik; flow AI‑olvasható; minden entitáson ownership</div></div></div>
+        <div class="phase"><div class="pn">F4</div><div class="pb"><h4>Upstream módosítások <span class="badge">parallel</span></h4><p class="meta">A7 · belépő: F0 (F1–F3 mellett)</p><p style="font-size:13px;margin:6px 0 0">MiniMax provider (config); Claude Code CLI (tmux).</p><div class="gate">▸ Kapu: gyári provider változatlan; MiniMax configból; CLI csak tmux‑szal</div></div></div>
+        <div class="phase"><div class="pn">F5</div><div class="pb"><h4>Hardening &amp; QA</h4><p class="meta">A9 + mind · belépő: F2–F4</p><p style="font-size:13px;margin:6px 0 0">Tesztek, tool‑autonómia eval, acceptance, SSE‑leak audit, dokumentáció.</p><div class="gate">▸ Kapu: minden elfogadási kritérium zöld; verifikáció kész</div></div></div>
+      </div>
+
+      <div class="pager"><a data-go="p-team"><span class="k">Előző</span><div class="t">← Agent‑csapat</div></a><a class="next" data-go="p-tools"><span class="k">Következő</span><div class="t">MCP toolok →</div></a></div>
+    </section>
+
+    <!-- ============ 06 TOOLS ============ -->
+    <section class="page" id="p-tools">
+      <span class="eyebrow">06 · Interfész</span>
+      <h1>MCP toolok — a „generáló endpointok"</h1>
+      <div class="callout warn"><b>A szövegezés maga is prompt</b>
+      Minden tool‑név, leírás és paraméter‑leírás úgy van megírva, hogy az LLM <b>külön külső promptolás nélkül</b> hívja láncba. Minden leírás megmondja: mit csinál, mikor hívd, mit ne, és mi a <code>nextAction</code>. Ezt a 16. fejezet eval‑ja validálja (fázis‑kapu).</div>
+
+      <table>
+        <tr><th>Tool</th><th>Szerep</th><th>Lényeg</th></tr>
+        <tr><td><code>mindmap_create</code></td><td>Új terv + első run queue‑ba</td><td>Gyorsan visszatér; tartós <code>planningId</code> + <code>runId</code> + <code>resourceUri</code> + <code>nextAction</code>.</td></tr>
+        <tr><td><code>mindmap_continue</code></td><td>Meglévő terv folytatása</td><td>Betölti a korábbi <code>messages</code> + <code>mindMap</code>‑et; plan‑szinten soros.</td></tr>
+        <tr><td><code>mindmap_get_status</code></td><td>Rövid állapot</td><td>Token‑hatékony; nincs teljes térkép/napló.</td></tr>
+        <tr><td><code>mindmap_get_result</code></td><td>Eredmény</td><td><code>outline</code>/<code>markdown</code>/<code>summary</code>; nagynál csak resource_link.</td></tr>
+        <tr><td><code>mindmap_cancel</code></td><td>Megszakítás</td><td>queued→törlés, running→AbortController; commitolt verzió marad.</td></tr>
+        <tr><td><code>mindmap_list</code></td><td>Lapozott lista</td><td>Csak rövid metaadat.</td></tr>
+        <tr><td><code>mindmap_document_add</code></td><td>PDF feltöltés</td><td>SSRF/path/size guard; nincs base64 az LLM kontextusán.</td></tr>
+        <tr><td><code>mindmap_document_index</code></td><td>RAG index</td><td>documentId‑nként egy indexelés (lock + upstream idempotencia).</td></tr>
+        <tr><td><code>mindmap_export</code> <span class="badge ac">új</span></td><td>Export</td><td>OPML + PNG; bináris resource_link‑ként.</td></tr>
+        <tr><td><code>mindmap_guide</code> <span class="badge ac">új</span></td><td>Flow‑recept</td><td>AI‑olvasható lánc; <b>kötelezően OPML+PNG exporttal zár</b>.</td></tr>
+      </table>
+
+      <div class="grid g2">
+        <div>
+          <h3>A flow‑recept (<code>mindmap_guide</code>)</h3>
+          <pre><code><span class="cmt">1)</span> mindmap_create(prompt[, documentId])
+   → jegyezd meg a planningId-t
+<span class="cmt">2)</span> ismételd: mindmap_get_status(planningId)
+   amíg status ∈ {completed, failed}
+<span class="cmt">3)</span> finomítás: mindmap_continue(planningId, instruction)
+   → vissza a 2)-re
+<span class="cmt">4)</span> mindmap_get_result(planningId, 'outline'|'markdown')
+<span class="cmt">5)</span> KÖTELEZŐ ZÁRÁS:
+   mindmap_export(planningId, ['opml','png'])
+
+<span class="cmt"># Soha ne találd ki / módosítsd</span>
+<span class="cmt"># a planningId/runId/documentId értékeket.</span></code></pre>
+        </div>
+        <div>
+          <h3>Belső: upstream supervisor</h3>
+          <p style="font-size:13.5px;color:var(--muted)">Nem feltétlenül LLM‑facing. Minden generáló hívás előtt:</p>
+          <pre><code>GET /api/health
+  ├─ ok      → tovább
+  └─ down    → indítsd az upstreamet
+               (konfigurált parancs),
+               várj health-zöldig
+               (exp. backoff, timeout, max retry)</code></pre>
+          <p style="font-size:12.5px;color:var(--muted)">A mind map „check, hogy fut‑e a server" követelménye. A health endpoint már létezik — csak pollozni és auto‑startolni kell.</p>
+        </div>
+      </div>
+
+      <h2>MCP resource‑ok</h2>
+      <pre><code>mindmap://plans/{planningId}            application/json
+mindmap://plans/{planningId}/outline    application/json
+mindmap://plans/{planningId}/markdown   text/markdown
+mindmap://plans/{planningId}/events     application/x-ndjson
+mindmap://plans/{planningId}/runs/{runId} application/json
+mindmap://documents/{documentId}        application/json
+mindmap://exports/{planningId}/opml     text/x-opml
+mindmap://exports/{planningId}/png      image/png
+mindmap://guide                         text/markdown</code></pre>
+
+      <div class="pager"><a data-go="p-phases"><span class="k">Előző</span><div class="t">← Fázisterv</div></a><a class="next" data-go="p-state"><span class="k">Következő</span><div class="t">State &amp; konkurrencia →</div></a></div>
+    </section>
+
+    <!-- ============ 07 STATE ============ -->
+    <section class="page" id="p-state">
+      <span class="eyebrow">07 · Megbízhatóság</span>
+      <h1>Perzisztencia, queue &amp; konkurrencia</h1>
+      <p class="lead">A stateless engine fölé tartós állapot, soros plan‑módosítás és optimista verziózás kerül. A „jó ötletek + modern" döntés szerint Redis‑mentes alternatívát ajánlunk.</p>
+
+      <div class="grid g2">
+        <div class="card"><h3 style="margin-top:0">Tárolás (ajánlás + alternatíva)</h3>
+          <dl class="kv">
+            <dt>Durable</dt><dd>PostgreSQL (plan/run/event/idempotency/ownership)</dd>
+            <dt>Queue</dt><dd><b>pg‑boss</b> (Postgres, Redis‑mentes) <i>vagy</i> BullMQ (Redis)</dd>
+            <dt>Dokumentum</dt><dd>objektumtároló / kontrollált FS</dd>
+            <dt>Memória</dt><dd>csak AbortController + aktív worker ref</dd>
+          </dl>
+          <p style="font-size:12.5px;color:var(--muted)">A queue‑döntés ADR‑ben rögzítendő. Bun 1.3 natív Postgres kliense kihasználható.</p>
+        </div>
+        <div class="card"><h3 style="margin-top:0">Concurrency szabályok</h3>
+          <ul style="font-size:13.3px;margin-top:4px">
+            <li>különböző <code>planningId</code> → párhuzamos</li>
+            <li>azonos <code>planningId</code> módosítói → <b>sorban</b> (<code>perPlanning = 1</code>)</li>
+            <li>dokumentum‑index → külön queue</li>
+            <li>backpressure; <code>429</code>/<code>5xx</code> → exp. backoff</li>
+            <li>config nélküli korlátlan párhuzamosság <b>tilos</b></li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>Konzisztencia, idempotencia, retry</h2>
+      <div class="grid g2">
+        <div>
+          <pre><code><span class="cmt">// optimista zár run-induláskor</span>
+baseVersion = plan.version
+workingSnapshot = clone(plan)
+<span class="cmt">// commit CSAK ha:</span>
+if (plan.version === baseVersion) commit()
+else conflict() <span class="cmt">// nem írja felül az újabbat</span></code></pre>
+        </div>
+        <div>
+          <div class="callout ok" style="margin-top:0"><b>Biztonságos retry</b>
+          Csak: kapcsolatfelépítési hiba, timeout az <i>első érdemi esemény előtt</i>, <code>429</code>, átmeneti <code>502/503/504</code>. <b>Nem</b> retry‑olunk olyan futást, amely már dolgozott fel mind‑map eseményt. Partial event sosem kerül a commitolt állapotba.</div>
+        </div>
+      </div>
+
+      <h2>SSE no‑leak — a mind map explicit követelménye</h2>
+      <div class="callout"><b>„Ne maradjon sok SSE kapcsolat"</b>
+      Runonként egyetlen upstream SSE kapcsolat, <code>AbortController</code>‑hez kötve; garantált lezárás <code>done</code>/<code>failed</code>/<code>cancel</code>/timeout/shutdown esetén; idle‑ és max‑életkor timeout; a concurrency limit megakadályozza a felhalmozódást. A QA‑nak <b>explicit leak‑auditja</b> van: terhelés alatt a nyitott socketek száma stabil, futások után 0.</div>
+
+      <div class="pager"><a data-go="p-tools"><span class="k">Előző</span><div class="t">← MCP toolok</div></a><a class="next" data-go="p-export"><span class="k">Következő</span><div class="t">Export, flow, biztonság →</div></a></div>
+    </section>
+
+    <!-- ============ 08 EXPORT/SECURITY ============ -->
+    <section class="page" id="p-export">
+      <span class="eyebrow">08 · Export &amp; biztonság</span>
+      <h1>Export, flow‑endpoint és biztonság</h1>
+
+      <h2>OPML + PNG export</h2>
+      <div class="grid g2">
+        <div class="card"><h3 style="margin-top:0">OPML</h3><p style="font-size:13.5px;color:var(--muted)">Determinisztikusan generálható az outline‑ból (<code>&lt;outline text="..."&gt;</code> fa). Tiszta függvény a <code>packages/shared</code>‑ben, unit‑tesztelve.</p></div>
+        <div class="card"><h3 style="margin-top:0">PNG — ADR‑döntés</h3><p style="font-size:13px;color:var(--muted);margin-top:0">Az upstream export kliens‑oldali (AntV X6), ezért headless megoldás kell:</p>
+          <p style="font-size:12.8px;margin:6px 0"><b>(A)</b> Headless render X6‑tal (pixelpontos, böngészőt igényel)</p>
+          <p style="font-size:12.8px;margin:6px 0"><b>(B)</b> Szerver‑oldali layout (ELK/d3‑flextree) → SVG → resvg/sharp <span class="badge ac">ajánlott</span></p>
+          <p style="font-size:12px;color:var(--muted)">(B) a headless tisztaságért; (A) fidelity‑fallback.</p>
+        </div>
+      </div>
+
+      <div class="callout info"><b>Flow‑endpoint (<code>mindmap_guide</code>)</b>
+      A dokumentált upstream folyamat + a megtervezett MCP toolok AI‑olvasható receptje, amely <b>kötelezően OPML+PNG exporttal zár</b>. A mind map <code>0f8287b7</code> követelménye.</div>
+
+      <h2>Biztonság</h2>
+      <table>
+        <tr><th>Terület</th><th>Követelmény</th></tr>
+        <tr><td>Ownership</td><td>Minden <code>plan</code>/<code>run</code>/<code>document</code> <code>ownerId</code>‑vel; minden tool ellenőrzi a hozzáférést. A <code>planningId</code> önmagában <b>nem</b> jogosultsági token.</td></tr>
+        <tr><td>Upstream URL</td><td>Nem tool‑argumentumból — configból + allowlistből.</td></tr>
+        <tr><td>Titkok</td><td>API kulcs nem tool‑argumentum; env / secret manager.</td></tr>
+        <tr><td>Dokumentum</td><td>SSRF‑, path‑traversal‑, méret‑védelem.</td></tr>
+        <tr><td>Kvóta</td><td>Owner‑alapú rate‑limit + quota.</td></tr>
+        <tr><td>Naplózás</td><td>Nincs kulcs/érzékeny tartalom a logban.</td></tr>
+        <tr><td>HTTP deploy</td><td>OAuth 2.1 / bearer + owner isolation (2026‑07‑28 RC OAuth/OIDC‑kompatibilis).</td></tr>
+      </table>
+
+      <div class="pager"><a data-go="p-state"><span class="k">Előző</span><div class="t">← State &amp; konkurrencia</div></a><a class="next" data-go="p-upstream"><span class="k">Következő</span><div class="t">Upstream módosítások →</div></a></div>
+    </section>
+
+    <!-- ============ 09 UPSTREAM MODS ============ -->
+    <section class="page" id="p-upstream">
+      <span class="eyebrow">09 · Külön scope</span>
+      <h1>Upstream módosítások — <code>./original-MindGeniusAI</code></h1>
+      <p class="lead">A valós upstream kódbázison (Hono + Node + AI SDK v5 + pnpm), nem az MCP szerveren. A gyári viselkedés nem törhet.</p>
+
+      <div class="grid g2">
+        <div class="card">
+          <h3 style="margin-top:0">MiniMax provider <span class="badge ac">config‑bound</span></h3>
+          <p style="font-size:13.3px;color:var(--muted)">A gyári providerek (openai/anthropic/deepseek/moonshot) változatlanok. Új, configból kapcsolható provider:</p>
+          <pre><code><span class="cmt">// MiniMax OpenAI-kompatibilis → Moonshot-minta</span>
+ProviderName += 'minimax'
+createOpenAI({ baseURL, apiKey }).chat(model)
+
+<span class="cmt">// env</span>
+MINIMAX_API_KEY
+MINIMAX_BASE_URL = https://api.minimax.io/v1
+MINIMAX_MODEL    = MiniMax-M2 | M2.x | M3  <span class="cmt">// verifikáld</span>
+<span class="cmt">// per-request: X-LLM-Provider: minimax</span></code></pre>
+          <p style="font-size:12.3px;color:var(--muted)">Embedding hiányában a RAG szépen degradál (meglévő logika).</p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Claude Code CLI <span class="badge warn">tmux‑only</span></h3>
+          <p style="font-size:13.3px;color:var(--muted)">Interaktív <code>claude</code> session programozott vezérlése — kemény megkötésekkel:</p>
+          <ul style="font-size:13px">
+            <li><b>CSAK tmux</b>: <code>new-session</code> / <code>send-keys</code> / <code>capture-pane</code></li>
+            <li><b>TILOS</b> az Agent SDK</li>
+            <li><b>TILOS</b> a <code>claude -p</code> (print/headless)</li>
+          </ul>
+          <p style="font-size:12.5px;color:var(--muted)">Determinisztikus session‑életciklus, timeout/hibakezelés, strukturált pane‑kinyerés. Statikus teszt igazolja: nincs Agent SDK import, nincs <code>claude -p</code>.</p>
+        </div>
+      </div>
+
+      <div class="pager"><a data-go="p-export"><span class="k">Előző</span><div class="t">← Export &amp; biztonság</div></a><a class="next" data-go="p-tooling"><span class="k">Következő</span><div class="t">Eszközlánc &amp; QA →</div></a></div>
+    </section>
+
+    <!-- ============ 10 TOOLING/QA ============ -->
+    <section class="page" id="p-tooling">
+      <span class="eyebrow">10 · Eszközlánc &amp; minőség</span>
+      <h1>Fejlesztői eszközlánc és QA</h1>
+      <div class="badges">
+        <span class="badge ac">Bun (kötelező)</span><span class="badge ac">TypeScript 6</span><span class="badge">Prettier</span><span class="badge">ESLint (flat)</span><span class="badge">Lefthook</span><span class="badge"><code>bun test</code></span>
+      </div>
+
+      <div class="grid g2">
+        <div>
+          <h3>Lefthook — git hook kapuk</h3>
+          <pre><code>pre-commit:           <span class="cmt"># staged fájlokon</span>
+  parallel: true
+  commands:
+    eslint:   bunx eslint {staged_files}
+    prettier: bunx prettier --write {staged_files}
+
+pre-push:             <span class="cmt"># lokális, lassabb</span>
+  commands:
+    unit-tests: bun test</code></pre>
+          <p style="font-size:12.5px;color:var(--muted)">A mind map „stack" ágának pontos leképezése: pre‑commit = eslint + prettier, pre‑push = unit tesztek. CI ugyanezek a kapuk.</p>
+        </div>
+        <div>
+          <h3>Tesztelés</h3>
+          <ul style="font-size:13.3px">
+            <li><b>Unit:</b> OPML generátor, markdown→outline parser determinizmusa, reducer (minden eseménytípus), version/commit, idempotencia, security guardok.</li>
+            <li><b>Integráció:</b> end‑to‑end <code>/api/agent</code> SSE; upload→init→query; cancellation valóban abortál.</li>
+            <li><b>SSE‑leak audit:</b> socket‑szám stabil, futás után 0.</li>
+          </ul>
+          <div class="callout warn" style="margin-top:10px"><b>Tool‑autonómia eval (fázis‑kapu)</b>
+          Az MCP‑t valós hostba kötve, <b>külön promptolás nélkül</b> kell az LLM‑nek helyes láncot hívnia (<code>create→status*→result→export</code>). Ha bukik, a <b>tool‑szövegezést</b> javítjuk, nem a hostot.</div>
+        </div>
+      </div>
+
+      <div class="pager"><a data-go="p-upstream"><span class="k">Előző</span><div class="t">← Upstream módosítások</div></a><a class="next" data-go="p-accept"><span class="k">Következő</span><div class="t">Elfogadási kritériumok →</div></a></div>
+    </section>
+
+    <!-- ============ 11 ACCEPTANCE ============ -->
+    <section class="page" id="p-accept">
+      <span class="eyebrow">11 · Definition of Done</span>
+      <h1>Elfogadási kritériumok</h1>
+      <p class="lead">A spec‑tervezet 15 magpontja (frissítve) + 8 új kritérium a mind map kiegészítéseiből. F5 zárásához mind zöld.</p>
+
+      <h3>MCP mag</h3>
+      <div class="grid g2">
+        <ul style="font-size:13.2px">
+          <li>Kizárólag MCP toolokon át használja az LLM a backendet</li>
+          <li><code>mindmap_create</code> azonnal tartós <code>planningId</code></li>
+          <li>Több terv párhuzamosan</li>
+          <li>Azonos terv két módosítása nem párhuzamos</li>
+          <li>Plan‑ek állapota izolált</li>
+          <li>Restart után a planek visszatölthetők</li>
+          <li><code>mindmap_continue</code> messages + mindMap alapján</li>
+          <li>Minden SSE eseménytípus kezelve</li>
+        </ul>
+        <ul style="font-size:13.2px">
+          <li>Partial/hibás run nem ír felül commitolt verziót</li>
+          <li><code>mindmap_cancel</code> abortálja az upstream streamet</li>
+          <li>Global/owner/plan concurrency limit</li>
+          <li>Dokumentum párhuzamos indexelése = egy embedding‑futás</li>
+          <li>Nagy eredmény resource‑ként</li>
+          <li>Ownership minden planhez/dokumentumhoz</li>
+          <li>MCP Tasks <b>nélkül is</b> teljesen működik</li>
+        </ul>
+      </div>
+
+      <h3>Új kritériumok (mind map kiegészítések)</h3>
+      <table>
+        <tr><th>#</th><th>Kritérium</th></tr>
+        <tr><td>16</td><td><b>Export:</b> <code>mindmap_export</code> OPML + PNG; nagy bináris resource_link‑ként</td></tr>
+        <tr><td>17</td><td><b>Flow:</b> <code>mindmap_guide</code> AI‑olvasható recept, OPML+PNG zárással</td></tr>
+        <tr><td>18</td><td><b>Supervisor:</b> az upstream auto‑indul, csak health‑zöld után generál</td></tr>
+        <tr><td>19</td><td><b>SSE no‑leak</b> audit zöld</td></tr>
+        <tr><td>20</td><td><b>Tool‑autonómia</b> eval zöld</td></tr>
+        <tr><td>21</td><td><b>Eszközlánc:</b> Bun + TS6 + Prettier + ESLint + Lefthook működik</td></tr>
+        <tr><td>22</td><td><b>Upstream MiniMax</b> configból; gyári providerek változatlanok</td></tr>
+        <tr><td>23</td><td><b>Upstream CLI</b> csak tmux; nincs Agent SDK; nincs <code>claude -p</code> (statikusan igazolva)</td></tr>
+      </table>
+
+      <div class="pager"><a data-go="p-tooling"><span class="k">Előző</span><div class="t">← Eszközlánc &amp; QA</div></a><a class="next" data-go="p-trace"><span class="k">Következő</span><div class="t">Traceability mátrix →</div></a></div>
+    </section>
+
+    <!-- ============ 12 TRACE ============ -->
+    <section class="page" id="p-trace">
+      <span class="eyebrow">12 · Teljesség‑bizonyíték</span>
+      <h1>Követelmény‑traceability mátrix</h1>
+      <p class="lead">Minden eredeti mind‑map node ide van kötve. Ez bizonyítja, hogy semmi nem veszett el az eredetiből — a QA agent ezt ellenőrzi vissza.</p>
+      <table>
+        <tr><th>Node id</th><th>Eredeti szöveg (kivonat)</th><th>Fedés</th></tr>
+        <tr><td class="mono">3577c07d</td><td>MindGeniusAI MCP (gyökér)</td><td>Küldetés, architektúra</td></tr>
+        <tr><td class="mono">e1224492</td><td>Visszafejtés + dokumentálás; MCP‑ből szimulálni</td><td>Kontraktus, A1, F0</td></tr>
+        <tr><td class="mono">df7fc653</td><td>Ne maradjon sok SSE kapcsolat</td><td>SSE no‑leak, QA audit</td></tr>
+        <tr><td class="mono">e4f30690</td><td>Endpoints (csoport)</td><td>MCP toolok</td></tr>
+        <tr><td class="mono">da8b1292</td><td>Endpoint+paraméter = prompt; LLM magától</td><td>Tool‑design, autonómia eval</td></tr>
+        <tr><td class="mono">4d33843a</td><td>Check, hogy fut‑e a server; indítás; health</td><td>Supervisor (health létezik)</td></tr>
+        <tr><td class="mono">401cdda4</td><td>Server↔webapp feltérképezés + dokumentáció</td><td>Kontraktus, A1, F0</td></tr>
+        <tr><td class="mono">0f8287b7</td><td>Flow‑endpoint; OPML+PNG a végén</td><td><code>mindmap_guide</code>, export</td></tr>
+        <tr><td class="mono">8f7d0f98</td><td>Export külön endpointtal</td><td><code>mindmap_export</code></td></tr>
+        <tr><td class="mono">3c8fca45</td><td>stack (csoport)</td><td>Eszközlánc</td></tr>
+        <tr><td class="mono">b9eab9d1</td><td>Export endpointok támogatása</td><td><code>mindmap_export</code></td></tr>
+        <tr><td class="mono">2042127f</td><td>TS6 ha lehet, különben TS5 LTS</td><td>TS6 (stabil 2026‑03) ✅</td></tr>
+        <tr><td class="mono">ef158279</td><td>Bun kötelező</td><td>Eszközlánc</td></tr>
+        <tr><td class="mono">f0c520bf</td><td>Prettier kötelező</td><td>Eszközlánc</td></tr>
+        <tr><td class="mono">7b899ab5</td><td>Lefthook kötelező</td><td>lefthook.yml</td></tr>
+        <tr><td class="mono">716014a4</td><td>pre‑commit: eslint + prettier</td><td>lefthook.yml</td></tr>
+        <tr><td class="mono">85ae3795</td><td>pre‑push: unit tesztek</td><td>lefthook.yml, QA</td></tr>
+        <tr><td class="mono">fd9a03f0</td><td>./original‑MindGeniusAI (csoport)</td><td>Upstream módosítások</td></tr>
+        <tr><td class="mono">ca9fa511</td><td>módosítások (csoport)</td><td>Upstream módosítások</td></tr>
+        <tr><td class="mono">3ad19c57</td><td>MiniMax provider configból, gyári megtartva</td><td>A7 · MiniMax</td></tr>
+        <tr><td class="mono">cd03da52</td><td>Claude Code CLI csak tmux; nincs SDK/‑p</td><td>A7 · CLI</td></tr>
+        <tr><td class="mono">6191d4db</td><td>Specifikáció tervezet (referencia)</td><td>Beépítve, modernizálva</td></tr>
+      </table>
+
+      <div class="pager"><a data-go="p-accept"><span class="k">Előző</span><div class="t">← Elfogadási kritériumok</div></a><a class="next" data-go="p-verify"><span class="k">Következő</span><div class="t">Verifikáció &amp; források →</div></a></div>
+    </section>
+
+    <!-- ============ 13 VERIFY ============ -->
+    <section class="page" id="p-verify">
+      <span class="eyebrow">13 · Verifikáció</span>
+      <h1>Verifikációs protokoll &amp; források</h1>
+      <p class="lead">A fejlesztés első napján és release előtt kötelező. A stack‑verziók változnak — web‑kereséssel újra‑igazolandók.</p>
+
+      <div class="grid g2">
+        <div class="card"><h3 style="margin-top:0">Web‑verifikált stack (2026‑06‑26)</h3>
+          <dl class="kv">
+            <dt>MCP spec</dt><dd>stabil 2025‑11‑25 · RC 2026‑07‑28</dd>
+            <dt>MCP TS SDK</dt><dd>v1.x (produkció) · v2 ~Q3 2026</dd>
+            <dt>TypeScript</dt><dd>6.0 stabil (2026‑03‑23) · TS7 (Go) jön</dd>
+            <dt>Bun</dt><dd>1.3.x sáv</dd>
+            <dt>MiniMax</dt><dd>OpenAI‑kompatibilis <code>api.minimax.io/v1</code></dd>
+            <dt>Lefthook</dt><dd>aktív, Go‑binary, párhuzamos hookok</dd>
+          </dl>
+        </div>
+        <div class="card"><h3 style="margin-top:0">A protokoll 4 lépése</h3>
+          <ol style="font-size:13.2px">
+            <li>Verzió‑verifikáció web‑kereséssel (a fentiek frissítése)</li>
+            <li>Upstream kontraktus visszaigazolása a friss <code>main</code>‑ből (A1) → ADR eltérésnél</li>
+            <li><b>Független teljesség‑ellenőrzés</b> subagenttel a traceability mátrix ellen</li>
+            <li>Tool‑autonómia eval valós MCP hosttal</li>
+          </ol>
+        </div>
+      </div>
+
+      <h2>Ellenőrzött források</h2>
+      <table>
+        <tr><th>Terület</th><th>Forrás</th></tr>
+        <tr><td>MindGeniusAI repo</td><td><a href="https://github.com/xianjianlf2/MindGeniusAI" target="_blank" rel="noopener">github.com/xianjianlf2/MindGeniusAI</a></td></tr>
+        <tr><td>MCP spec 2025‑11‑25</td><td><a href="https://modelcontextprotocol.io/specification/2025-11-25" target="_blank" rel="noopener">modelcontextprotocol.io/specification/2025-11-25</a></td></tr>
+        <tr><td>MCP 2026‑07‑28 RC</td><td><a href="https://blog.modelcontextprotocol.io/posts/2026-07-28-release-candidate/" target="_blank" rel="noopener">blog.modelcontextprotocol.io · 2026‑07‑28 RC</a></td></tr>
+        <tr><td>MCP TypeScript SDK</td><td><a href="https://github.com/modelcontextprotocol/typescript-sdk" target="_blank" rel="noopener">github.com/modelcontextprotocol/typescript-sdk</a></td></tr>
+        <tr><td>TypeScript 6.0</td><td><a href="https://devblogs.microsoft.com/typescript/announcing-typescript-6-0/" target="_blank" rel="noopener">devblogs.microsoft.com · Announcing TypeScript 6.0</a></td></tr>
+        <tr><td>Bun</td><td><a href="https://bun.com/" target="_blank" rel="noopener">bun.com</a></td></tr>
+        <tr><td>Lefthook</td><td><a href="https://lefthook.dev/" target="_blank" rel="noopener">lefthook.dev</a></td></tr>
+        <tr><td>MiniMax OpenAI‑kompatibilis API</td><td><a href="https://platform.minimax.io/docs/api-reference/text-openai-api" target="_blank" rel="noopener">platform.minimax.io · OpenAI API</a></td></tr>
+      </table>
+
+      <div class="callout ok"><b>A teljes, átadható terv‑prompt</b> a kísérő markdown fájlban van: <code>Easter-Mind-Map-MCP-terv-prompt.md</code> — azt add át a következő session agent‑csapatának.</div>
+
+      <p class="foot">Készült: 2026‑06‑26 · Multi‑agent terv‑report · Stack‑ és protokoll‑verziók a fejlesztés első napján újra‑verifikálandók.</p>
+
+      <div class="pager"><a data-go="p-trace"><span class="k">Előző</span><div class="t">← Traceability mátrix</div></a><a class="disabled"></a></div>
+    </section>
+
+<script>
+  var pages = Array.prototype.slice.call(document.querySelectorAll('.page'));
+  var navlinks = Array.prototype.slice.call(document.querySelectorAll('#nav a[data-go]'));
+  var crumb = document.getElementById('crumb');
+  function labelFor(id){ var l=document.querySelector('#nav a[data-go="'+id+'"]'); return l? l.textContent.replace(/^\s*\d+\s*/,'').trim() : ''; }
+  function go(id){
+    pages.forEach(function(p){ p.classList.toggle('active', p.id===id); });
+    navlinks.forEach(function(a){ a.classList.toggle('active', a.getAttribute('data-go')===id); });
+    crumb.innerHTML = labelFor(id);
+    document.querySelector('.main').scrollTo ? window.scrollTo({top:0,behavior:'smooth'}) : window.scrollTo(0,0);
+    if(history.replaceState) history.replaceState(null,'','#'+id);
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target.closest('[data-go]');
+    if(t){ e.preventDefault(); go(t.getAttribute('data-go')); }
+  });
+  // theme
+  var tb = document.getElementById('themeBtn');
+  tb.addEventListener('click', function(){
+    var h=document.documentElement; h.setAttribute('data-theme', h.getAttribute('data-theme')==='dark'?'light':'dark');
+  });
+  // deep-link
+  var initial=(location.hash||'').replace('#',''); if(initial && document.getElementById(initial)) go(initial);
+</script>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>
