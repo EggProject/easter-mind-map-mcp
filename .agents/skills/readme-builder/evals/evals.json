@@ -1,0 +1,47 @@
+{
+  "skill_name": "readme-builder",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I just pushed a new Node.js CLI tool to GitHub (a markdown linter called 'md-lint', with a bin field, written in TypeScript, MIT licensed, copyright 'Jane Developer 2026'). I have no README yet and no LICENSE. Please set up the project so it looks professional.",
+      "expected_output": "The skill should: (1) create a TodoList with the six mandatory phases, (2) detect the project as a CLI tool from the bin field, (3) ask via AskUserQuestion which license to use (with MIT pre-selected as Recommended), (4) run download_license.py to write LICENSE and .license-meta.json, (5) fill in cli-tool.md to produce README.md, (6) mirror to cli-tool.hu.md to produce README.hu.md with the [English version] link, (7) report which template was used, badge URLs, and the LICENSE download status.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I'm working on a small Python utility library called 'pyfsm' — a finite-state machine implementation, no CLI, just `from pyfsm import StateMachine`. Apache-2.0, copyright 'Acme Corp 2026'. The repo is at /Users/me/projects/pyfsm. Make a proper README for it.",
+      "expected_output": "The skill should: (1) TodoList with six phases, (2) detect Python library from pyproject.toml / setup.py, (3) AskUserQuestion for license with Apache-2.0 pre-selected (not MIT, because Apache is a better default for Python enterprise), (4) download LICENSE, (5) fill library.md for README.md, (6) mirror to library.hu.md, (7) include a one-line pip install command, a one-line `from pyfsm import StateMachine; ...` usage example, and the SPDX-id'd license section.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "My friend gave me a repo for a Chrome extension that converts web pages to markdown. There's a package.json, a manifest.json, a popup.html, and some background scripts. The README is just one line: '# md-web'. Help me turn this into a real README.",
+      "expected_output": "The skill should: (1) TodoList with six phases, (2) detect that this is a browser extension (manifest.json + popup.html), (3) note that no template matches exactly and use the no-template path (or adapt web-app.md with a 'Chrome-specific Install' twist), (4) AskUserQuestion for license, (5) download LICENSE, (6) produce README.md with Chrome Web Store badge, a Chrome-specific Installation section ('Load unpacked' or 'Install from Chrome Web Store'), a 'How it works' section describing the popup / content script architecture, and the standard License section, (7) mirror to README.hu.md.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "I have a monorepo with 4 packages: @acme/core, @acme/cli, @acme/web, @acme/api. pnpm-workspace.yaml is present, all packages share a CHANGELOG.md. License: MIT, copyright 'Acme Corp 2026'. The README is empty.",
+      "expected_output": "The skill should: (1) TodoList with six phases, (2) detect monorepo from pnpm-workspace.yaml, (3) AskUserQuestion for license (MIT pre-selected as Recommended), (4) download LICENSE, (5) fill monorepo.md with a Packages table listing all four packages, the Quick Start with pnpm install / pnpm build / pnpm test, the pnpm --filter example for single-package work, an Architecture ASCII diagram, and the standard License section, (6) mirror to monorepo.hu.md with the same structure but Hungarian prose.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "I maintain a Go web framework called 'gusto'. The repo already has a docs/ folder with installation.md, routing.md, middleware.md, deployment.md and api.md, and go.mod (it's imported as a package, no main). MIT, copyright 'Gusto Authors 2026'. The current README is a 400-line mess. Rewrite it into a clean hub README that links out to all those docs pages instead of cramming everything in.",
+      "expected_output": "Because the README is large with a real docs/ folder, the skill should produce a hub README with a '📖 Documentation' table linking each docs/*.md page. The key thing being tested: every icon+link is in the house form `<emoji> **[Label](docs/x.md)**` — the emoji OUTSIDE the bold link and the brackets (hard rule #11) — e.g. `📦 **[Installation](docs/installation.md)**`, NOT `**[📦 Installation](docs/installation.md)**` and NOT `[📦 **Installation**](docs/installation.md)`. The top-of-file bilingual switcher must also follow the house form: `🇭🇺 **[Magyar verzió →](README.hu.md)**` in README.md and `🇬🇧 **[English version →](README.md)**` in README.hu.md. Otherwise the normal flow applies (six-phase TodoList, AskUserQuestion license with MIT recommended, download LICENSE, bilingual mirror).",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "I built a Rust CLI called 'jsonpeek' that pretty-prints and queries JSON with colored output (installable via `cargo install jsonpeek`). MIT, copyright 'me 2026'. For the README I'd love a screenshot of a sample command and its output that looks like a proper macOS terminal window — you know, with the little red/yellow/green dots in the corner. Is that doable? Set up the README with it.",
+      "expected_output": "The skill should consult references/terminal-blocks.md and recognize this is a STATIC snapshot (one command + its colored output, no motion) → a code→image renderer, defaulting to `freeze --window` for the macOS traffic-light chrome, output as SVG. Tool-install policy is the thing being tested: if the renderer isn't already installed, it must be installed into the skill's own `tmp/` directory ($SKILL/tmp) and run from there — NEVER globally — then cleaned up with `rm -rf $SKILL/tmp` afterward. The rendered image must be committed into the PROJECT's docs/ (not tmp/, not hotlinked — hard rule #9) and embedded with meaningful alt text, ideally with a plain copy-pasteable fenced code block kept alongside it. Plus the normal cli-tool flow: six-phase TodoList, AskUserQuestion license (MIT recommended), download LICENSE, English + Hungarian READMEs.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "my tool 'scaffold' is an interactive CLI (node, npm i -g scaffold) that asks a few questions and then generates a project, showing a progress bar while it works. apache-2.0, 'Devs Inc 2026'. i want the readme hero to be an ANIMATED terminal demo of the whole flow, not just a static screenshot — can you do that?",
+      "expected_output": "The skill should consult references/terminal-blocks.md and, because this is a PROCESS over time (typing + an interactive prompt + a progress bar), pick the ANIMATED path, defaulting to `vhs` with a committed .tape script (deterministic / regenerable) rather than a hand-recorded session. Install policy is tested: if vhs (or asciinema/svg-term) isn't present, install into the skill's `tmp/` ($SKILL/tmp, e.g. GOBIN=$SKILL/tmp/bin) and run from there, never globally; clean up tmp/ when done. The generated GIF/animated-SVG goes into the PROJECT's docs/ with meaningful alt text. Apache-2.0 should be the pre-selected license (better default than MIT for this), LICENSE downloaded, six-phase TodoList, and a Hungarian mirror produced.",
+      "files": []
+    }
+  ]
+}
