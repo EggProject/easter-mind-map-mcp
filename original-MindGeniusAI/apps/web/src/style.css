@@ -1,0 +1,234 @@
+/* =========================================================
+   MindGenius AI — Atelier Noir
+   A theme for an instrument, not an interface.
+   Graphite ramp · signal (agent reasoning) · ember (tool execution)
+   Hairlines, not borders · calm void, local bloom
+   ========================================================= */
+
+:root {
+  /* ---- Surfaces · graphite ramp (faint cool tint, never green) ---- */
+  --an-void: #07080B;       /* page floor / recessed plate */
+  --c-bg: #0B0D11;          /* canvas — board ground */
+  --c-surface: #0E1116;     /* base — panel ground */
+  --c-surface-2: #14171C;   /* surface — card, node */
+  --c-elevated: #1A1E25;    /* raised — hover, menu */
+  --c-overlay: #161A21;     /* floating menu/popover ground */
+
+  /* ---- Borders / hairlines (depth from 1px white at 5–10%) ---- */
+  --c-border: rgba(255, 255, 255, 0.06);
+  --c-border-strong: rgba(255, 255, 255, 0.10);
+  --c-border-focus: rgba(155, 199, 232, 0.45);
+  --hl-top: inset 0 1px 0 rgba(255, 255, 255, 0.05);  /* top-edge inner highlight */
+
+  /* ---- Text ---- */
+  --c-text: #ECEAE3;        /* primary */
+  --c-text-2: #A8A59C;      /* body */
+  --c-text-3: #6D6E73;      /* faint — mono labels, eyebrows */
+  --c-text-disabled: #4A5160;
+
+  /* ---- Accent · SIGNAL (the agent's thought — cool pale blue) ---- */
+  --c-accent: #9BC7E8;
+  --c-accent-hover: #C9DEED;
+  --c-accent-press: #7FB3DC;
+  --c-accent-soft: rgba(155, 199, 232, 0.14);
+  --c-accent-softer: rgba(155, 199, 232, 0.08);
+  --c-accent-line: rgba(155, 199, 232, 0.40);
+  --c-signal: #9BC7E8;
+  --c-signal-wash: rgba(155, 199, 232, 0.10);
+  --c-signal-wash-bg: #1B2A38;
+  --c-signal-edge: #355A77;
+
+  /* ---- EMBER (the agent's hands — tool execution, warm tungsten) ---- */
+  --c-ember: #E8C690;
+  --c-ember-hover: #F0DCB8;
+  --c-ember-soft: rgba(232, 198, 144, 0.14);
+  --c-ember-softer: rgba(232, 198, 144, 0.08);
+  --c-ember-line: rgba(232, 198, 144, 0.40);
+  --c-ember-wash: rgba(232, 198, 144, 0.10);
+  --c-ember-wash-bg: #2D2418;
+
+  /* ---- Semantic status (only at small sizes — pip, word, icon) ---- */
+  --c-ok: #9CC8A3;
+  --c-ok-soft: rgba(156, 200, 163, 0.13);
+  --c-warn: #D8A66E;
+  --c-warn-soft: rgba(216, 166, 110, 0.14);
+  --c-err: #D08471;
+  --c-err-soft: rgba(208, 132, 113, 0.14);
+  --c-info: #9BC7E8;
+  --c-info-soft: rgba(155, 199, 232, 0.13);
+
+  /* ---- Typography · Geist for thought, JetBrains Mono for truth ---- */
+  --f-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+            "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "JetBrains Mono", "SF Mono", ui-monospace, "Cascadia Code",
+            "Roboto Mono", Menlo, Consolas, monospace;
+
+  /* ---- Radius · tight, instrument-grade ---- */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 11px;
+  --r-xl: 14px;
+
+  /* ---- Shadow · depth without weight (no drop-shadow stacks) ---- */
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --sh-2: 0 8px 22px -10px rgba(0, 0, 0, 0.60);
+  --sh-3: 0 22px 56px -16px rgba(0, 0, 0, 0.72);
+  --sh-pop: 0 16px 40px -12px rgba(0, 0, 0, 0.66), var(--hl-top), 0 0 0 1px var(--c-border);
+
+  /* ---- Motion · one curve, four durations ---- */
+  --d-snap: 120ms;     /* click feedback */
+  --d-ease: 240ms;     /* panel transit (default) */
+  --d-settle: 480ms;   /* canvas rearrange */
+  --d-breath: 2400ms;  /* live agent indicators only */
+  --ease-an: cubic-bezier(0.2, 0.7, 0.1, 1);
+
+  /* ---- Density (overridden by .density-compact) ---- */
+  --chat-gap: 18px;
+  --node-pad-y: 11px;
+  --node-pad-x: 15px;
+}
+
+.density-compact {
+  --chat-gap: 12px;
+  --node-pad-y: 8px;
+  --node-pad-x: 12px;
+}
+
+/* =========================================================
+   Base
+   ========================================================= */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body {
+  font-family: var(--f-sans);
+  font-feature-settings: "ss01", "cv11";
+  background: var(--c-bg);
+  color: var(--c-text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+::selection { background: rgba(155, 199, 232, 0.28); color: #F2F0EA; }
+
+button { font-family: inherit; background: none; border: none; cursor: pointer; }
+input, textarea { font-family: inherit; }
+
+/* Scrollbars — thin, unobtrusive */
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--c-border-strong);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: #2F353F; background-clip: padding-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+.mono { font-family: var(--f-mono); }
+.tnum { font-variant-numeric: tabular-nums; }
+.no-drag { -webkit-user-select: none; user-select: none; }
+
+/* =========================================================
+   Animations
+   ========================================================= */
+@keyframes mg-card-in {
+  from { transform: translateY(7px); }
+  to   { transform: translateY(0); }
+}
+.mg-card-in { animation: mg-card-in 0.34s cubic-bezier(.21, .9, .3, 1); }
+
+@keyframes mg-node-pop {
+  0%   { transform: scale(.82); }
+  60%  { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+.mg-node-pop { animation: mg-node-pop 0.4s cubic-bezier(.2, .8, .25, 1); }
+
+@keyframes mg-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+.mg-caret {
+  display: inline-block; width: 7px; height: 1.05em; margin-left: 1px;
+  background: var(--c-signal); border-radius: 1px;
+  transform: translateY(2px);
+  animation: mg-blink 1s steps(1) infinite;
+}
+
+/* Atelier · live agent indicators — "alive only where the work is happening" */
+@keyframes an-breath { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.an-breath { animation: an-breath var(--d-breath) ease-in-out infinite; }
+
+@keyframes an-beam-x { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
+/* a 1px scanning hairline along the top edge of a live panel/card */
+.an-beam { position: relative; }
+.an-beam::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--c-ember), transparent);
+  animation: an-beam-x 2.8s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes mg-spin { to { transform: rotate(360deg); } }
+.mg-spin { animation: mg-spin 0.8s linear infinite; }
+
+@keyframes mg-shimmer {
+  0%   { background-position: -360px 0; }
+  100% { background-position: 360px 0; }
+}
+.mg-shimmer {
+  background: linear-gradient(90deg, var(--c-elevated) 0%, #232831 50%, var(--c-elevated) 100%);
+  background-size: 720px 100%;
+  animation: mg-shimmer 1.5s linear infinite;
+}
+
+@keyframes mg-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.mg-fade-in { animation: mg-fade-in .25s ease; }
+
+@keyframes mg-drawer-in {
+  from { transform: translateX(18px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+.mg-drawer-in { animation: mg-drawer-in .28s cubic-bezier(.2, .8, .25, 1); }
+
+/* Canvas dot field — 22px grid at ~4.5% opacity, the canvas's only texture */
+.mg-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.045) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
+}
+
+/* =========================================================
+   Markdown (assistant messages)
+   ========================================================= */
+.markdown-body {
+  font-size: 13px;
+  line-height: 1.65;
+  word-break: break-word;
+  color: var(--c-text);
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  margin: 8px 0 4px;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 20px;
+}
+
+.markdown-body pre {
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  padding: 8px;
+  overflow-x: auto;
+}
+
+.markdown-body code {
+  font-family: var(--f-mono);
+  font-size: 12px;
+}
