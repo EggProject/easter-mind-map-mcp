@@ -36,20 +36,18 @@ split documentation below instead of keeping everything in this file.
 
 ## Documentation
 
-| Topic               | English                                                | Magyar                                                 |
-| ------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
-| Documentation index | [docs/README.md](docs/README.md)                       | [docs/README.hu.md](docs/README.hu.md)                 |
-| Installation        | [docs/en/installation.md](docs/en/installation.md)     | [docs/hu/installation.md](docs/hu/installation.md)     |
-| Configuration       | [docs/en/configuration.md](docs/en/configuration.md)   | [docs/hu/configuration.md](docs/hu/configuration.md)   |
-| Usage               | [docs/en/usage.md](docs/en/usage.md)                   | [docs/hu/usage.md](docs/hu/usage.md)                   |
-| Tool reference      | [docs/en/tool-reference.md](docs/en/tool-reference.md) | [docs/hu/tool-reference.md](docs/hu/tool-reference.md) |
-| Architecture        | [docs/en/architecture.md](docs/en/architecture.md)     | [docs/hu/architecture.md](docs/hu/architecture.md)     |
+- 📖 **[Documentation index](docs/README.md)**
+- 📦 **[Installation](docs/en/installation.md)**
+- ⚙️ **[Configuration](docs/en/configuration.md)**
+- ▶️ **[Usage](docs/en/usage.md)**
+- 🧰 **[Tool reference](docs/en/tool-reference.md)**
+- 🏗️ **[Architecture](docs/en/architecture.md)**
 
 Existing engineering notes:
 
-- [MCP tool contract](docs/MCP-TOOLS.md)
-- [MindGeniusAI upstream contract](docs/UPSTREAM-CONTRACT.md)
-- [Architecture decisions](docs/ADR/)
+- 🧭 **[MCP tool contract](docs/MCP-TOOLS.md)**
+- 🔌 **[MindGeniusAI upstream contract](docs/UPSTREAM-CONTRACT.md)**
+- 🧱 **[Architecture decisions](docs/ADR/)**
 
 ## Project layout
 

@@ -36,20 +36,18 @@ használd az alább szétbontott dokumentációt, ne ezt az egy fájlt.
 
 ## Dokumentáció
 
-| Téma                | English                                                | Magyar                                                 |
-| ------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
-| Dokumentációs index | [docs/README.md](docs/README.md)                       | [docs/README.hu.md](docs/README.hu.md)                 |
-| Telepítés           | [docs/en/installation.md](docs/en/installation.md)     | [docs/hu/installation.md](docs/hu/installation.md)     |
-| Konfiguráció        | [docs/en/configuration.md](docs/en/configuration.md)   | [docs/hu/configuration.md](docs/hu/configuration.md)   |
-| Használat           | [docs/en/usage.md](docs/en/usage.md)                   | [docs/hu/usage.md](docs/hu/usage.md)                   |
-| Tool referencia     | [docs/en/tool-reference.md](docs/en/tool-reference.md) | [docs/hu/tool-reference.md](docs/hu/tool-reference.md) |
-| Architektúra        | [docs/en/architecture.md](docs/en/architecture.md)     | [docs/hu/architecture.md](docs/hu/architecture.md)     |
+- 📖 **[Dokumentációs index](docs/README.hu.md)**
+- 📦 **[Telepítés](docs/hu/installation.md)**
+- ⚙️ **[Konfiguráció](docs/hu/configuration.md)**
+- ▶️ **[Használat](docs/hu/usage.md)**
+- 🧰 **[Tool referencia](docs/hu/tool-reference.md)**
+- 🏗️ **[Architektúra](docs/hu/architecture.md)**
 
 Meglévő mérnöki jegyzetek:
 
-- [MCP tool szerződés](docs/MCP-TOOLS.md)
-- [MindGeniusAI upstream szerződés](docs/UPSTREAM-CONTRACT.md)
-- [Architektúradöntések](docs/ADR/)
+- 🧭 **[MCP tool szerződés](docs/MCP-TOOLS.md)**
+- 🔌 **[MindGeniusAI upstream szerződés](docs/UPSTREAM-CONTRACT.md)**
+- 🧱 **[Architektúradöntések](docs/ADR/)**
 
 ## Projektstruktúra
 
