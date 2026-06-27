@@ -1,22 +1,7 @@
 ---
 name: readme-builder
 description: |
-  Use this skill whenever the user wants to create, rewrite, audit, or
-  improve a README.md for any kind of software project (Node/Python/Go/Rust
-  library, CLI tool, web app, REST/GraphQL API, mobile app, desktop app,
-  monorepo, data-science project, VS Code extension, browser extension,
-  GitHub Action, etc.), or whenever a repository is missing one and the
-  user asks you to scaffold it. This skill picks the right template from
-  the bundled library, falls back to a step-by-step "no-template"
-  authoring guide when no match exists, downloads a real LICENSE file
-  from GitHub's official license API (the user picks the SPDX type via
-  AskUserQuestion first), and always produces BOTH an English `README.md`
-  and a Hungarian `README.hu.md` so the project matches the bilingual
-  convention used in this workspace. Trigger this skill aggressively: if
-  the user mentions "README", "project documentation", "first impression
-  for my repo", "open-source landing page", "GitHub project page", or
-  says "help me set up my project so people understand what it does",
-  use this skill — even if they don't ask for a "skill" by name.
+  Create README files.
 license: MIT
 ---
 
