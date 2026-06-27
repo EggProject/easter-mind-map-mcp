@@ -5,6 +5,7 @@
 ## Követelmények
 
 - Bun `>=1.3.0`
+- pnpm elérhető a `PATH`-on az automatikus bundled upstream installhoz/indításhoz
 - HTTP-n elérhető MindGeniusAI upstream szerver
 - Stdio szervert indítani tudó MCP host
 
@@ -48,6 +49,9 @@ A repo gyökerét add meg working directoryként, hogy a relatív utak, példáu
       "cwd": "/absolute/path/to/easter-mind-map-mcp",
       "env": {
         "MINDGENIUS_BASE_URL": "http://127.0.0.1:8787",
+        "MINDGENIUS_ENV_LLM_PROVIDER": "minimax",
+        "MINDGENIUS_ENV_MINIMAX_API_KEY": "sk-...",
+        "MINDGENIUS_ENV_MINIMAX_MODEL": "MiniMax-M3",
         "MINDMAP_DATA_DIR": "data",
         "MINDMAP_DOCUMENT_ROOTS": "documents"
       }
@@ -59,15 +63,20 @@ A repo gyökerét add meg working directoryként, hogy a relatív utak, példáu
 Saját fejlesztés közben minden forrásmódosítás után futtasd újra a
 `bun run build` parancsot, mielőtt újraindítod az MCP hostot.
 
-Ha az upstream még nem fut, állítsd be a `MINDGENIUS_START_COMMAND` változót
-arra a parancsra, amely elindítja. Az adapter minden upstream futás előtt
-ellenőrzi az `/api/health` végpontot, és a beállított health timeoutig vár.
+Ha az upstream még nem fut, az adapter alapértelmezetten a
+`pnpm --dir original-MindGeniusAI dev:server` paranccsal indítja az
+`original-MindGeniusAI` szervert. Ha az `original-MindGeniusAI/node_modules`
+hiányzik, előbb lefuttatja a `pnpm --dir original-MindGeniusAI install
+--frozen-lockfile` parancsot. A `MINDGENIUS_START_COMMAND` vagy
+`MINDGENIUS_INSTALL_COMMAND` változót csak akkor írd felül, ha más parancsot
+akarsz. Az adapter minden upstream futás előtt ellenőrzi az `/api/health`
+végpontot, és a beállított health timeoutig vár.
 
 ## Upstream alkalmazás
 
-A repo tartalmaz egy upstream snapshotot az `original-MindGeniusAI/`
-könyvtárban. Ennek saját scriptjei `pnpm`-et használnak; ezt az alkalmazást az
-adaptertől külön kell konfigurálni.
+A repo tartalmazza az upstream szervert az `original-MindGeniusAI/`
+könyvtárban. Ennek saját scriptjei `pnpm`-et használnak; az adapter szükség
+esetén automatikusan telepíti a függőségeit.
 
 ```bash
 cd original-MindGeniusAI
@@ -75,6 +84,7 @@ pnpm install
 pnpm dev:server
 ```
 
-A `MINDGENIUS_BASE_URL` arra a szerver URL-re mutasson, amely kiszolgálja az
-`/api/health`, `/api/agent`, `/api/uploadFile` és `/api/document/init`
-végpontokat.
+Ezeket a parancsokat csak akkor használd, ha kézzel akarod futtatni az
+upstreamet. A `MINDGENIUS_BASE_URL` arra a szerver URL-re mutasson, amely
+kiszolgálja az `/api/health`, `/api/agent`, `/api/uploadFile` és
+`/api/document/init` végpontokat.

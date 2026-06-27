@@ -25275,11 +25275,19 @@ class StdioServerTransport {
 
 // src/config.ts
 import { resolve } from "path";
+var DEFAULT_UPSTREAM_START_COMMAND = "pnpm --dir original-MindGeniusAI dev:server";
+var DEFAULT_UPSTREAM_INSTALL_COMMAND = "pnpm --dir original-MindGeniusAI install --frozen-lockfile";
+var UPSTREAM_ENV_PREFIX = "MINDGENIUS_ENV_";
 function loadConfig(env = process.env) {
   const cwd = process.cwd();
+  const upstreamPort = env.MINDGENIUS_ENV_PORT ?? env.PORT;
+  const upstreamBaseUrl = env.MINDGENIUS_BASE_URL ?? `http://127.0.0.1:${upstreamPort ?? 8787}`;
   return {
-    upstreamBaseUrl: env.MINDGENIUS_BASE_URL ?? "http://127.0.0.1:8787",
-    upstreamStartCommand: env.MINDGENIUS_START_COMMAND,
+    upstreamBaseUrl,
+    upstreamStartCommand: env.MINDGENIUS_START_COMMAND ?? DEFAULT_UPSTREAM_START_COMMAND,
+    upstreamInstallCommand: env.MINDGENIUS_INSTALL_COMMAND ?? DEFAULT_UPSTREAM_INSTALL_COMMAND,
+    upstreamInstallCheckPath: resolve(cwd, "original-MindGeniusAI/node_modules"),
+    upstreamEnv: upstreamEnvFrom(env, upstreamBaseUrl),
     upstreamHealthTimeoutMs: numberFromEnv(env.MINDGENIUS_HEALTH_TIMEOUT_MS, 30000),
     dataDir: resolve(cwd, env.MINDMAP_DATA_DIR ?? "data"),
     allowedDocumentRoots: (env.MINDMAP_DOCUMENT_ROOTS ?? resolve(cwd, "documents")).split(",").map((root) => resolve(root.trim())).filter(Boolean),
@@ -25292,6 +25300,28 @@ function loadConfig(env = process.env) {
       maxRetries: numberFromEnv(env.MINDMAP_MAX_RETRIES, 1)
     }
   };
+}
+function upstreamEnvFrom(env, upstreamBaseUrl) {
+  const upstreamEnv = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined)
+      upstreamEnv[key] = value;
+  }
+  for (const [key, value] of Object.entries(env)) {
+    if (key.startsWith(UPSTREAM_ENV_PREFIX) && value !== undefined) {
+      upstreamEnv[key.slice(UPSTREAM_ENV_PREFIX.length)] = value;
+    }
+  }
+  upstreamEnv.PORT ??= portFromUrl(upstreamBaseUrl);
+  return upstreamEnv;
+}
+function portFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.port || (parsed.protocol === "https:" ? "443" : "80");
+  } catch {
+    return "8787";
+  }
 }
 function numberFromEnv(value, fallback) {
   if (!value)
@@ -26286,6 +26316,7 @@ var GUIDE = [
 `);
 
 // src/upstream/client.ts
+import { existsSync } from "fs";
 import { basename } from "path";
 
 // src/upstream/sse.ts
@@ -26348,20 +26379,30 @@ class HttpUpstreamClient {
   healthTimeoutMs;
   startUpstream;
   requestTimeoutMs;
+  installCommand;
+  installCheckPath;
+  upstreamEnv;
+  runInstallCommand;
   supervisorStarted = false;
-  constructor(baseUrl, startCommand, healthTimeoutMs = 30000, startUpstream = defaultStartUpstream, requestTimeoutMs = 180000) {
+  installPromise;
+  constructor(baseUrl, startCommand, healthTimeoutMs = 30000, startUpstream = defaultStartUpstream, requestTimeoutMs = 180000, installCommand, installCheckPath, upstreamEnv = process.env, runInstallCommand = defaultRunCommand) {
     this.baseUrl = baseUrl;
     this.startCommand = startCommand;
     this.healthTimeoutMs = healthTimeoutMs;
     this.startUpstream = startUpstream;
     this.requestTimeoutMs = requestTimeoutMs;
+    this.installCommand = installCommand;
+    this.installCheckPath = installCheckPath;
+    this.upstreamEnv = upstreamEnv;
+    this.runInstallCommand = runInstallCommand;
   }
   async ensureReady(signal) {
     if (await this.isHealthy(signal))
       return;
     if (this.startCommand && !this.supervisorStarted) {
+      await this.ensureInstalled();
       this.supervisorStarted = true;
-      this.startUpstream(this.startCommand);
+      this.startUpstream(this.startCommand, { env: this.upstreamEnv });
     }
     const started = Date.now();
     while (Date.now() - started < this.healthTimeoutMs) {
@@ -26441,12 +26482,31 @@ class HttpUpstreamClient {
       return false;
     }
   }
+  async ensureInstalled() {
+    if (!this.installCommand)
+      return;
+    if (this.installCheckPath && existsSync(this.installCheckPath))
+      return;
+    this.installPromise ??= this.runInstallCommand(this.installCommand, { env: this.upstreamEnv });
+    await this.installPromise;
+  }
 }
-function defaultStartUpstream(command) {
+function defaultStartUpstream(command, options) {
   Bun.spawn(command.split(/\s+/), {
     stdout: "ignore",
-    stderr: "ignore"
+    stderr: "ignore",
+    env: options?.env
   }).unref();
+}
+async function defaultRunCommand(command, options) {
+  const process3 = Bun.spawn(command.split(/\s+/), {
+    stdout: "ignore",
+    stderr: "ignore",
+    env: options?.env
+  });
+  const exitCode = await process3.exited;
+  if (exitCode !== 0)
+    throw new Error(`Command failed with exit code ${exitCode}: ${command}`);
 }
 function sleep(ms, signal) {
   return new Promise((resolve3, reject) => {
@@ -26504,7 +26564,7 @@ function createStdioTransport() {
 function makeDefaultComponents(config2) {
   return {
     store: new FileStore(config2.dataDir),
-    upstream: new HttpUpstreamClient(config2.upstreamBaseUrl, config2.upstreamStartCommand, config2.upstreamHealthTimeoutMs, undefined, config2.concurrency.upstreamRequestTimeoutMs)
+    upstream: new HttpUpstreamClient(config2.upstreamBaseUrl, config2.upstreamStartCommand, config2.upstreamHealthTimeoutMs, undefined, config2.concurrency.upstreamRequestTimeoutMs, config2.upstreamInstallCommand, config2.upstreamInstallCheckPath, config2.upstreamEnv)
   };
 }
 function registerTools(server, service) {

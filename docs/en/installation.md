@@ -5,6 +5,7 @@
 ## Requirements
 
 - Bun `>=1.3.0`
+- pnpm available on `PATH` for automatic bundled upstream installation/startup
 - A MindGeniusAI upstream server reachable over HTTP
 - An MCP host that can launch a stdio server
 
@@ -47,6 +48,9 @@ Use the repository root as the working directory so relative paths such as
       "cwd": "/absolute/path/to/easter-mind-map-mcp",
       "env": {
         "MINDGENIUS_BASE_URL": "http://127.0.0.1:8787",
+        "MINDGENIUS_ENV_LLM_PROVIDER": "minimax",
+        "MINDGENIUS_ENV_MINIMAX_API_KEY": "sk-...",
+        "MINDGENIUS_ENV_MINIMAX_MODEL": "MiniMax-M3",
         "MINDMAP_DATA_DIR": "data",
         "MINDMAP_DOCUMENT_ROOTS": "documents"
       }
@@ -58,15 +62,18 @@ Use the repository root as the working directory so relative paths such as
 During your own development, re-run `bun run build` after each source change
 before restarting the MCP host.
 
-If the upstream is not already running, set `MINDGENIUS_START_COMMAND` to a
-command that starts it. The adapter checks `/api/health` before each upstream
-run and waits for the configured health timeout.
+If the upstream is not already running, the adapter starts
+`original-MindGeniusAI` with `pnpm --dir original-MindGeniusAI dev:server` by
+default. If `original-MindGeniusAI/node_modules` is missing, it first runs
+`pnpm --dir original-MindGeniusAI install --frozen-lockfile`. Override
+`MINDGENIUS_START_COMMAND` or `MINDGENIUS_INSTALL_COMMAND` only when you want a
+different command. The adapter checks `/api/health` before each upstream run and
+waits for the configured health timeout.
 
 ## Upstream application
 
-The repository contains an upstream snapshot in `original-MindGeniusAI/`. Its
-own scripts use `pnpm`; keep that application configured separately from this
-adapter.
+The repository contains the upstream server in `original-MindGeniusAI/`. Its own
+scripts use `pnpm`; the adapter installs dependencies automatically when needed.
 
 ```bash
 cd original-MindGeniusAI
@@ -74,5 +81,6 @@ pnpm install
 pnpm dev:server
 ```
 
-Point `MINDGENIUS_BASE_URL` at the server URL that exposes `/api/health`,
-`/api/agent`, `/api/uploadFile`, and `/api/document/init`.
+Use those commands only when you want to run the upstream manually. Point
+`MINDGENIUS_BASE_URL` at the server URL that exposes `/api/health`, `/api/agent`,
+`/api/uploadFile`, and `/api/document/init`.

@@ -1,23 +1,40 @@
+import { existsSync } from 'node:fs'
 import { basename } from 'node:path'
 import type { AgentRequest, RunAgentOptions, UpstreamClient } from '../types'
 import { decodeAgentEvent, parseSseStream } from './sse'
 
+interface UpstreamProcessOptions {
+  env?: Record<string, string>
+}
+
 export class HttpUpstreamClient implements UpstreamClient {
   private supervisorStarted = false
+  private installPromise?: Promise<void>
 
   constructor(
     private readonly baseUrl: string,
     private readonly startCommand?: string,
     private readonly healthTimeoutMs = 30_000,
-    private readonly startUpstream: (command: string) => void = defaultStartUpstream,
+    private readonly startUpstream: (
+      command: string,
+      options?: UpstreamProcessOptions,
+    ) => void = defaultStartUpstream,
     private readonly requestTimeoutMs = 180_000,
+    private readonly installCommand?: string,
+    private readonly installCheckPath?: string,
+    private readonly upstreamEnv: Record<string, string> = process.env as Record<string, string>,
+    private readonly runInstallCommand: (
+      command: string,
+      options?: UpstreamProcessOptions,
+    ) => Promise<void> = defaultRunCommand,
   ) {}
 
   async ensureReady(signal?: AbortSignal): Promise<void> {
     if (await this.isHealthy(signal)) return
     if (this.startCommand && !this.supervisorStarted) {
+      await this.ensureInstalled()
       this.supervisorStarted = true
-      this.startUpstream(this.startCommand)
+      this.startUpstream(this.startCommand, { env: this.upstreamEnv })
     }
     const started = Date.now()
     while (Date.now() - started < this.healthTimeoutMs) {
@@ -89,13 +106,31 @@ export class HttpUpstreamClient implements UpstreamClient {
       return false
     }
   }
+
+  private async ensureInstalled(): Promise<void> {
+    if (!this.installCommand) return
+    if (this.installCheckPath && existsSync(this.installCheckPath)) return
+    this.installPromise ??= this.runInstallCommand(this.installCommand, { env: this.upstreamEnv })
+    await this.installPromise
+  }
 }
 
-function defaultStartUpstream(command: string): void {
+function defaultStartUpstream(command: string, options?: UpstreamProcessOptions): void {
   Bun.spawn(command.split(/\s+/), {
     stdout: 'ignore',
     stderr: 'ignore',
+    env: options?.env,
   }).unref()
+}
+
+async function defaultRunCommand(command: string, options?: UpstreamProcessOptions): Promise<void> {
+  const process = Bun.spawn(command.split(/\s+/), {
+    stdout: 'ignore',
+    stderr: 'ignore',
+    env: options?.env,
+  })
+  const exitCode = await process.exited
+  if (exitCode !== 0) throw new Error(`Command failed with exit code ${exitCode}: ${command}`)
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {

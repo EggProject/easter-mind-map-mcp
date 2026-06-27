@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'bun:test'
@@ -23,6 +23,90 @@ describe('HTTP upstream client SSE hygiene', () => {
     const client = new HttpUpstreamClient('http://upstream.test', 'true', 1_000)
     await client.ensureReady()
     expect(healthChecks).toBe(2)
+  })
+
+  it('runs the default install command before the default supervisor start when deps are missing', async () => {
+    let healthChecks = 0
+    globalThis.fetch = (async () => {
+      healthChecks += 1
+      return new Response(null, { status: healthChecks === 1 ? 503 : 200 })
+    }) as unknown as typeof fetch
+    const dataDir = await mkdtemp(join(tmpdir(), 'mindmap-default-install-'))
+
+    const client = new HttpUpstreamClient(
+      'http://upstream.test',
+      'true',
+      1_000,
+      undefined,
+      180_000,
+      'true',
+      join(dataDir, 'missing-node-modules'),
+      { PATH: process.env.PATH ?? '' },
+    )
+
+    await client.ensureReady()
+    expect(healthChecks).toBe(2)
+  })
+
+  it('installs missing upstream dependencies and forwards env before starting', async () => {
+    let started = false
+    const calls: Array<{ type: string; command: string; env?: Record<string, string> }> = []
+    globalThis.fetch = (async () =>
+      new Response(null, { status: started ? 200 : 503 })) as unknown as typeof fetch
+    const dataDir = await mkdtemp(join(tmpdir(), 'mindmap-install-'))
+
+    const client = new HttpUpstreamClient(
+      'http://upstream.test',
+      'start-upstream',
+      1_000,
+      (command, options) => {
+        started = true
+        calls.push({ type: 'start', command, env: options?.env })
+      },
+      180_000,
+      'install-upstream',
+      join(dataDir, 'node_modules'),
+      { OPENAI_API_KEY: 'sk-test' },
+      async (command, options) => {
+        calls.push({ type: 'install', command, env: options?.env })
+      },
+    )
+
+    await client.ensureReady()
+    expect(calls.map((call) => `${call.type}:${call.command}`)).toEqual([
+      'install:install-upstream',
+      'start:start-upstream',
+    ])
+    expect(calls.every((call) => call.env?.OPENAI_API_KEY === 'sk-test')).toBe(true)
+  })
+
+  it('skips upstream dependency install when the marker path exists', async () => {
+    let started = false
+    let installCalls = 0
+    globalThis.fetch = (async () =>
+      new Response(null, { status: started ? 200 : 503 })) as unknown as typeof fetch
+    const dataDir = await mkdtemp(join(tmpdir(), 'mindmap-install-skip-'))
+    const marker = join(dataDir, 'node_modules')
+    await mkdir(marker)
+
+    const client = new HttpUpstreamClient(
+      'http://upstream.test',
+      'start-upstream',
+      1_000,
+      () => {
+        started = true
+      },
+      180_000,
+      'install-upstream',
+      marker,
+      {},
+      async () => {
+        installCalls += 1
+      },
+    )
+
+    await client.ensureReady()
+    expect(installCalls).toBe(0)
   })
 
   it('times out when health never turns green', async () => {

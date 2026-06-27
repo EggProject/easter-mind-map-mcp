@@ -32,6 +32,11 @@ bun dist/index.js
 
 The committed `dist/index.js` is the runtime entrypoint for MCP hosts. Build from
 source only when you change the TypeScript files during your own development.
+When the upstream is not already healthy, the adapter starts the bundled
+`original-MindGeniusAI` server automatically with `pnpm --dir
+original-MindGeniusAI dev:server`.
+Set MindGeniusAI provider variables such as `MINDGENIUS_ENV_LLM_PROVIDER` and
+`MINDGENIUS_ENV_MINIMAX_API_KEY` in the MCP host environment.
 
 For MCP host setup, upstream configuration, and the required tool flow, use the
 split documentation below instead of keeping everything in this file.

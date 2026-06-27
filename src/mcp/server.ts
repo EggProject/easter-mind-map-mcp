@@ -63,6 +63,9 @@ export function makeDefaultComponents(config: ServerConfig): {
       config.upstreamHealthTimeoutMs,
       undefined,
       config.concurrency.upstreamRequestTimeoutMs,
+      config.upstreamInstallCommand,
+      config.upstreamInstallCheckPath,
+      config.upstreamEnv,
     ),
   }
 }
