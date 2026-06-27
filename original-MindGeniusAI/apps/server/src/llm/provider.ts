@@ -13,7 +13,7 @@ export interface LLMRequestConfig {
   model: string
 }
 
-const PROVIDERS: ProviderName[] = ['openai', 'anthropic', 'deepseek', 'moonshot']
+const PROVIDERS: ProviderName[] = ['openai', 'anthropic', 'deepseek', 'moonshot', 'minimax']
 
 /**
  * 解析单次请求使用的 LLM 配置，优先级：
@@ -52,6 +52,8 @@ export function chatModel(cfg: LLMRequestConfig): LanguageModel {
       return createAnthropic({ apiKey: cfg.apiKey, baseURL: cfg.baseURL })(cfg.model)
     case 'deepseek':
       return createDeepSeek({ apiKey: cfg.apiKey, baseURL: cfg.baseURL })(cfg.model)
+    case 'minimax':
+      return createOpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseURL }).chat(cfg.model)
     // Kimi/Moonshot 与自定义网关都走 OpenAI 协议。
     // 关键：用 .chat() 强制走 /v1/chat/completions —— 默认的 /v1/responses 在多数
     // 代理网关 / Kimi / DeepSeek 兼容端点上不被支持，会直接 APICallError 导致出不了图。

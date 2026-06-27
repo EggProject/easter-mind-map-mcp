@@ -7,7 +7,7 @@ dotenv.config()
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-export type ProviderName = 'openai' | 'anthropic' | 'deepseek' | 'moonshot'
+export type ProviderName = 'openai' | 'anthropic' | 'deepseek' | 'moonshot' | 'minimax'
 
 export const config = {
   port: Number(process.env.PORT ?? 3000),
@@ -37,6 +37,12 @@ export const config = {
       apiKey: process.env.MOONSHOT_API_KEY,
       baseURL: process.env.MOONSHOT_BASE_URL ?? 'https://api.moonshot.cn/v1',
       model: process.env.MOONSHOT_MODEL ?? 'moonshot-v1-8k',
+    },
+    // MiniMax —— OpenAI 协议兼容，走 createOpenAI + baseURL
+    minimax: {
+      apiKey: process.env.MINIMAX_API_KEY,
+      baseURL: process.env.MINIMAX_BASE_URL ?? 'https://api.minimax.io/v1',
+      model: process.env.MINIMAX_MODEL ?? 'MiniMax-M3',
     },
   },
   // RAG 向量化独立配置：chat 走 Kimi/DeepSeek（无 embeddings 接口）时，
