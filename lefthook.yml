@@ -1,0 +1,14 @@
+pre-commit:
+  parallel: true
+  commands:
+    eslint:
+      glob: '*.{ts,tsx}'
+      run: bunx eslint {staged_files}
+    prettier:
+      glob: '*.{ts,tsx,json,md,yml,yaml}'
+      run: bunx prettier --write {staged_files}
+      stage_fixed: true
+pre-push:
+  commands:
+    unit-tests:
+      run: bun test

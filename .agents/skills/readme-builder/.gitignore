@@ -1,0 +1,3 @@
+# Scratch space for terminal-image tooling (see references/terminal-blocks.md).
+# Tools are installed here and run from here, then removed — never committed.
+tmp/

@@ -1,0 +1,9 @@
+.agents/
+.idea/
+AGENTS.md
+data/
+dist/
+node_modules/
+original-MindGeniusAI/
+docs/plan/
+bun.lock
