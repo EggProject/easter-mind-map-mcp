@@ -63,6 +63,14 @@ A repo gyökerét add meg working directoryként, hogy a relatív utak, példáu
 Saját fejlesztés közben minden forrásmódosítás után futtasd újra a
 `bun run build` parancsot, mielőtt újraindítod az MCP hostot.
 
+A provider változóknak annak az MCP szerver processnek a környezetében kell
+benne lenniük, amelyik a `bun dist/index.js` parancsot futtatja. A `~/.zshrc`
+jellegű shell startup fájlok MCP hostoknál csak akkor megbízható források, ha
+maga a host process is abból a shell sessionből indult. Megbízható beállításhoz
+tedd a `MINDGENIUS_ENV_LLM_PROVIDER`, `MINDGENIUS_ENV_MINIMAX_API_KEY` és
+kapcsolódó értékeket az MCP host `env` blokkjába, vagy indítsd az MCP hostot
+olyan környezetből, ahol ezek már exportálva vannak.
+
 Ha az upstream még nem fut, az adapter alapértelmezetten a
 `pnpm --dir original-MindGeniusAI dev:server` paranccsal indítja az
 `original-MindGeniusAI` szervert. Ha az `original-MindGeniusAI/node_modules`

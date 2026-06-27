@@ -2,12 +2,14 @@
 command = "bun"
 args = ["dist/index.js"]
 cwd = "."
+env_vars = ["MINDGENIUS_ENV_MINIMAX_API_KEY"]
 
 [mcp_servers.easter-mind-map.env]
 MINDGENIUS_ENV_LLM_PROVIDER = "minimax"
 MINDGENIUS_ENV_MINIMAX_MODEL = "MiniMax-M3"
 MINDMAP_DATA_DIR = "data"
 MINDMAP_DOCUMENT_ROOTS = "documents"
+LOGLEVEL = "DEBUG"
 
 [mcp_servers.easter-mind-map.tools.mindmap_guide]
 approval_mode = "approve"

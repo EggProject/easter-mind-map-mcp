@@ -58,6 +58,13 @@ változókat közvetlenül az MCP host config `env` mezőjében is megadhatod, p
 `LLM_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `MINIMAX_API_KEY`,
 `MINIMAX_MODEL`, `EMBEDDING_API_KEY`, `DISABLE_UPLOAD` és `MAX_UPLOAD_MB`.
 
+Az MCP szerver csak azokat a változókat tudja továbbadni, amelyek a
+`bun dist/index.js` indulásakor látszanak a saját `process.env` értékében. A
+`~/.zshrc` jellegű shell startup fájlok nem érvényesek automatikusan minden MCP
+host processre. Ha shell fájlra támaszkodsz, az MCP hostot abból a shell
+sessionből indítsd; különben a provider változókat az MCP host `env` blokkjába
+tedd.
+
 Ütközések elkerülésére használható a `MINDGENIUS_ENV_` prefix is. Az adapter ezt
 levágja, mielőtt elindítja az upstreamet:
 
@@ -70,6 +77,12 @@ levágja, mielőtt elindítja az upstreamet:
   }
 }
 ```
+
+`LOGLEVEL=DEBUG` mellett az indítási log tartalmazza azokat az env kulcsokat,
+amelyeket az adapter továbbad a MindGeniusAI-nak. A titoknak tűnő értékek
+redaktálva jelennek meg, tehát egy jelen lévő API kulcs `<redacted>` értékkel
+látszik, nem nyersen. Ha egy kulcs nem szerepel ott, akkor az MCP szerver process
+nem kapta meg.
 
 Ha a `MINDGENIUS_BASE_URL` nincs beállítva, a `MINDGENIUS_ENV_PORT` vagy `PORT`
 a default health-check URL-t is módosítja. Egyébként az adapter `PORT=8787`

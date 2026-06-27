@@ -62,6 +62,14 @@ Use the repository root as the working directory so relative paths such as
 During your own development, re-run `bun run build` after each source change
 before restarting the MCP host.
 
+Provider variables must be present in the environment of the MCP server process
+that runs `bun dist/index.js`. Shell startup files such as `~/.zshrc` are not a
+reliable source for MCP hosts unless the host process was launched from that
+same shell session. For reliable setup, put `MINDGENIUS_ENV_LLM_PROVIDER`,
+`MINDGENIUS_ENV_MINIMAX_API_KEY`, and related values in the MCP host `env`
+block, or start the MCP host from an environment where those variables are
+already exported.
+
 If the upstream is not already running, the adapter starts
 `original-MindGeniusAI` with `pnpm --dir original-MindGeniusAI dev:server` by
 default. If `original-MindGeniusAI/node_modules` is missing, it first runs

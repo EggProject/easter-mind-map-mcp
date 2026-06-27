@@ -37,6 +37,10 @@ Ha az upstream még nem healthy, az adapter automatikusan elindítja a bundled
 paranccsal.
 A MindGeniusAI provider változókat, például `MINDGENIUS_ENV_LLM_PROVIDER` és
 `MINDGENIUS_ENV_MINIMAX_API_KEY`, az MCP host env-jében add meg.
+A változóknak a `bun dist/index.js` process indulásakor kell látszaniuk. A
+`~/.zshrc` jellegű shell startup fájlok csak akkor elegendők, ha maga az MCP
+host is abból a shell sessionből indult; különben tedd a változókat az MCP host
+`env` blokkjába.
 A logolás alapból ki van kapcsolva `LOGLEVEL=NONE` értékkel; `LOGLEVEL=DEBUG`
 esetén részletes adapter és MindGeniusAI szerverkimenet íródik a `logs/` alá.
 

@@ -57,6 +57,12 @@ MindGeniusAI variables directly in the MCP host config, for example
 `LLM_PROVIDER`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `MINIMAX_API_KEY`,
 `MINIMAX_MODEL`, `EMBEDDING_API_KEY`, `DISABLE_UPLOAD`, and `MAX_UPLOAD_MB`.
 
+The MCP server can only forward variables that are visible in its own
+`process.env` when `bun dist/index.js` starts. Shell startup files such as
+`~/.zshrc` do not automatically apply to every MCP host process. If you rely on
+a shell file, start the MCP host from that shell session; otherwise put the
+provider variables in the MCP host `env` block.
+
 You can also use the `MINDGENIUS_ENV_` prefix to avoid collisions. The adapter
 strips the prefix before starting the upstream:
 
@@ -69,6 +75,11 @@ strips the prefix before starting the upstream:
   }
 }
 ```
+
+With `LOGLEVEL=DEBUG`, the startup log includes the environment keys that the
+adapter forwards to MindGeniusAI. Secret-looking values are redacted, so a
+present API key appears as `<redacted>` instead of the raw value. If a key is not
+listed there, the MCP server process did not receive it.
 
 If `MINDGENIUS_BASE_URL` is not set, `MINDGENIUS_ENV_PORT` or `PORT` also
 changes the default health-check URL. Otherwise the adapter sets `PORT=8787` for

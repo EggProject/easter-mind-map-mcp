@@ -37,6 +37,10 @@ When the upstream is not already healthy, the adapter starts the bundled
 original-MindGeniusAI dev:server`.
 Set MindGeniusAI provider variables such as `MINDGENIUS_ENV_LLM_PROVIDER` and
 `MINDGENIUS_ENV_MINIMAX_API_KEY` in the MCP host environment.
+They must be visible to the `bun dist/index.js` process when it starts. Shell
+startup files such as `~/.zshrc` only work when the MCP host itself was launched
+from that shell session; otherwise put the variables in the MCP host `env`
+block.
 Logging is off by default with `LOGLEVEL=NONE`; set `LOGLEVEL=DEBUG` to write
 detailed adapter and MindGeniusAI server output under `logs/`.
 
