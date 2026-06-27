@@ -22,10 +22,15 @@ bun run build
 bun run format:check
 ```
 
+`bun run build` type-checks the project and writes the MCP runtime entrypoint to
+`dist/index.js`. Configure MCP hosts to run the built `dist` file, not the
+TypeScript source file.
+
 ## Run the MCP server directly
 
 ```bash
-bun src/index.ts
+bun run build
+bun dist/index.js
 ```
 
 The process starts an MCP stdio server and waits for the host to speak the MCP
@@ -41,7 +46,7 @@ Use the repository root as the working directory so relative paths such as
   "mcpServers": {
     "easter-mind-map": {
       "command": "bun",
-      "args": ["src/index.ts"],
+      "args": ["dist/index.js"],
       "cwd": "/absolute/path/to/easter-mind-map-mcp",
       "env": {
         "MINDGENIUS_BASE_URL": "http://127.0.0.1:8787",
@@ -52,6 +57,8 @@ Use the repository root as the working directory so relative paths such as
   }
 }
 ```
+
+Re-run `bun run build` after each source change before restarting the MCP host.
 
 If the upstream is not already running, set `MINDGENIUS_START_COMMAND` to a
 command that starts it. The adapter checks `/api/health` before each upstream

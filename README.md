@@ -27,8 +27,8 @@ calls a MindGeniusAI HTTP/SSE upstream configured with environment variables.
 
 ```bash
 bun install
-bun test
-bun src/index.ts
+bun run build
+bun dist/index.js
 ```
 
 For MCP host setup, upstream configuration, and the required tool flow, use the
@@ -60,13 +60,13 @@ original-MindGeniusAI/  Upstream MindGeniusAI application snapshot
 
 ## Scripts
 
-| Command                | Purpose                                     |
-| ---------------------- | ------------------------------------------- |
-| `bun test`             | Run the Bun test suite.                     |
-| `bun run build`        | Type-check the project with `tsc --noEmit`. |
-| `bun run lint`         | Run ESLint.                                 |
-| `bun run format:check` | Check Prettier formatting.                  |
-| `bun run format`       | Format matched files with Prettier.         |
+| Command                | Purpose                                           |
+| ---------------------- | ------------------------------------------------- |
+| `bun test`             | Run the Bun test suite.                           |
+| `bun run build`        | Type-check the project and write `dist/index.js`. |
+| `bun run lint`         | Run ESLint.                                       |
+| `bun run format:check` | Check Prettier formatting.                        |
+| `bun run format`       | Format matched files with Prettier.               |
 
 ## License
 

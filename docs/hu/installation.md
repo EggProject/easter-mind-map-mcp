@@ -22,10 +22,15 @@ bun run build
 bun run format:check
 ```
 
+A `bun run build` type-checket futtat, majd a MCP runtime entrypointot a
+`dist/index.js` fájlba írja. Az MCP hostokat a buildelt `dist` fájlra
+konfiguráld, ne a TypeScript forrásfájlra.
+
 ## MCP szerver közvetlen futtatása
 
 ```bash
-bun src/index.ts
+bun run build
+bun dist/index.js
 ```
 
 A folyamat MCP stdio szervert indít, és arra vár, hogy a host MCP protokollon
@@ -41,7 +46,7 @@ A repo gyökerét add meg working directoryként, hogy a relatív utak, példáu
   "mcpServers": {
     "easter-mind-map": {
       "command": "bun",
-      "args": ["src/index.ts"],
+      "args": ["dist/index.js"],
       "cwd": "/absolute/path/to/easter-mind-map-mcp",
       "env": {
         "MINDGENIUS_BASE_URL": "http://127.0.0.1:8787",
@@ -52,6 +57,9 @@ A repo gyökerét add meg working directoryként, hogy a relatív utak, példáu
   }
 }
 ```
+
+Minden forrásmódosítás után futtasd újra a `bun run build` parancsot, mielőtt
+újraindítod az MCP hostot.
 
 Ha az upstream még nem fut, állítsd be a `MINDGENIUS_START_COMMAND` változót
 arra a parancsra, amely elindítja. Az adapter minden upstream futás előtt

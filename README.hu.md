@@ -27,8 +27,8 @@ környezeti változókkal beállított MindGeniusAI HTTP/SSE upstreamet hív.
 
 ```bash
 bun install
-bun test
-bun src/index.ts
+bun run build
+bun dist/index.js
 ```
 
 Az MCP host bekötéséhez, az upstream beállításához és a kötelező tool flow-hoz
@@ -60,13 +60,13 @@ original-MindGeniusAI/  Upstream MindGeniusAI alkalmazas snapshot
 
 ## Scriptek
 
-| Parancs                | Cél                                          |
-| ---------------------- | -------------------------------------------- |
-| `bun test`             | Bun tesztcsomag futtatása.                   |
-| `bun run build`        | TypeScript type-check `tsc --noEmit` modban. |
-| `bun run lint`         | ESLint futtatása.                            |
-| `bun run format:check` | Prettier formátumellenőrzés.                 |
-| `bun run format`       | Illeszkedő fájlok formázása Prettierrel.     |
+| Parancs                | Cél                                                |
+| ---------------------- | -------------------------------------------------- |
+| `bun test`             | Bun tesztcsomag futtatása.                         |
+| `bun run build`        | Type-check futtatása és `dist/index.js` készítése. |
+| `bun run lint`         | ESLint futtatása.                                  |
+| `bun run format:check` | Prettier formátumellenőrzés.                       |
+| `bun run format`       | Illeszkedő fájlok formázása Prettierrel.           |
 
 ## Licenc
 
