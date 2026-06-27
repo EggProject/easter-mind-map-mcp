@@ -1,5 +1,7 @@
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
+import { normalizeLogLevel } from './logger'
 import type { ConcurrencyConfig } from './types'
+import type { LogLevel } from './logger'
 
 export interface ServerConfig {
   upstreamBaseUrl: string
@@ -8,6 +10,8 @@ export interface ServerConfig {
   upstreamInstallCheckPath?: string
   upstreamEnv: Record<string, string>
   upstreamHealthTimeoutMs: number
+  logLevel: LogLevel
+  logPath: string
   dataDir: string
   allowedDocumentRoots: string[]
   concurrency: ConcurrencyConfig
@@ -29,6 +33,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     upstreamInstallCheckPath: resolve(cwd, 'original-MindGeniusAI/node_modules'),
     upstreamEnv: upstreamEnvFrom(env, upstreamBaseUrl),
     upstreamHealthTimeoutMs: numberFromEnv(env.MINDGENIUS_HEALTH_TIMEOUT_MS, 30_000),
+    logLevel: normalizeLogLevel(env.LOGLEVEL ?? env.LOG_LEVEL ?? env.loglevel),
+    logPath: logPathFromEnv(env.LOGPATH ?? env.LOG_PATH ?? env.logpath, cwd),
     dataDir: resolve(cwd, env.MINDMAP_DATA_DIR ?? 'data'),
     allowedDocumentRoots: (env.MINDMAP_DOCUMENT_ROOTS ?? resolve(cwd, 'documents'))
       .split(',')
@@ -43,6 +49,12 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       maxRetries: numberFromEnv(env.MINDMAP_MAX_RETRIES, 1),
     },
   }
+}
+
+function logPathFromEnv(value: string | undefined, cwd: string): string {
+  const logsDir = resolve(cwd, 'logs')
+  if (!value?.trim()) return resolve(logsDir, 'easter-mind-map-mcp.log')
+  return resolve(logsDir, basename(value.trim()))
 }
 
 function upstreamEnvFrom(

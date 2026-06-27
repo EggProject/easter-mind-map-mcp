@@ -13,6 +13,8 @@ utak a folyamat working directoryjából oldódnak fel.
 | `MINDGENIUS_START_COMMAND`     | `pnpm --dir original-MindGeniusAI dev:server`                | Parancs az upstream indítására, ha a health check sikertelen.                                                   |
 | `MINDGENIUS_INSTALL_COMMAND`   | `pnpm --dir original-MindGeniusAI install --frozen-lockfile` | Egyszer futó parancs, ha a bundled upstream dependency-k hiányoznak.                                            |
 | `MINDGENIUS_HEALTH_TIMEOUT_MS` | `30000`                                                      | Maximális várakozási idő az upstream health checkre indítás után.                                               |
+| `LOGLEVEL`                     | `NONE`                                                       | Fájllogolási szint: `NONE`, `ERROR`, `WARN`, `INFO` vagy `DEBUG`.                                               |
+| `LOGPATH`                      | `logs/easter-mind-map-mcp.log`                               | Logfájl neve vagy útvonala. Az adapter a projekt `logs/` könyvtárán belül tartja.                               |
 | `MINDMAP_DATA_DIR`             | `data`                                                       | Lokális perzisztencia könyvtár tervekhez, futásokhoz, dokumentumokhoz, exportokhoz és idempotencia rekordokhoz. |
 | `MINDMAP_DOCUMENT_ROOTS`       | `documents`                                                  | Vesszővel elválasztott könyvtárlista, ahonnan lokális PDF dokumentum feltölthető.                               |
 | `MINDMAP_MAX_RUNS_GLOBAL`      | `4`                                                          | Globális párhuzamos generálási limit.                                                                           |
@@ -25,6 +27,11 @@ utak a folyamat working directoryjából oldódnak fel.
 
 A `MINDMAP_DATA_DIR` az adapter saját állapotát tárolja. A szerver folyamat
 számára írhatónak kell lennie, és ne használd forrásfájlokhoz.
+
+A `LOGPATH` a projekt `logs/` könyvtára alá ír, amit a git ignorál. A logolás
+alapból ki van kapcsolva `LOGLEVEL=NONE` értékkel. Használj `LOGLEVEL=DEBUG`
+beállítást, ha részletes MCP adapter eseményeket és a bundled MindGeniusAI
+szerver stdout/stderr kimenetét is látni akarod.
 
 A `MINDMAP_DOCUMENT_ROOTS` korlátozza, hogy a `mindmap_document_add` mely
 lokális PDF-eket töltheti fel. Az ezeken kívüli utak már az upstream hívása

@@ -25274,7 +25274,66 @@ class StdioServerTransport {
 }
 
 // src/config.ts
-import { resolve } from "path";
+import { basename, resolve } from "path";
+
+// src/logger.ts
+import { appendFileSync, mkdirSync } from "fs";
+import { dirname } from "path";
+var LEVEL_WEIGHT = {
+  NONE: 0,
+  ERROR: 1,
+  WARN: 2,
+  INFO: 3,
+  DEBUG: 4
+};
+var SECRET_KEY_PATTERN = /(api[_-]?key|token|secret|password|authorization|auth)/i;
+function normalizeLogLevel(value) {
+  const normalized = value?.trim().toUpperCase();
+  if (normalized === "ERROR" || normalized === "WARN" || normalized === "INFO" || normalized === "DEBUG")
+    return normalized;
+  return "NONE";
+}
+function createLogger(level, path) {
+  return new FileLogger(level, path);
+}
+function redactForLog(value) {
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) => [
+    key,
+    SECRET_KEY_PATTERN.test(key) ? "<redacted>" : entry
+  ]));
+}
+
+class FileLogger {
+  level;
+  path;
+  constructor(level, path) {
+    this.level = level;
+    this.path = path;
+  }
+  debug(message, meta) {
+    this.write("DEBUG", message, meta);
+  }
+  info(message, meta) {
+    this.write("INFO", message, meta);
+  }
+  warn(message, meta) {
+    this.write("WARN", message, meta);
+  }
+  error(message, meta) {
+    this.write("ERROR", message, meta);
+  }
+  write(level, message, meta) {
+    if (LEVEL_WEIGHT[this.level] < LEVEL_WEIGHT[level])
+      return;
+    try {
+      mkdirSync(dirname(this.path), { recursive: true });
+      appendFileSync(this.path, `${new Date().toISOString()} ${level} ${message}${meta ? ` ${JSON.stringify(meta)}` : ""}
+`);
+    } catch {}
+  }
+}
+
+// src/config.ts
 var DEFAULT_UPSTREAM_START_COMMAND = "pnpm --dir original-MindGeniusAI dev:server";
 var DEFAULT_UPSTREAM_INSTALL_COMMAND = "pnpm --dir original-MindGeniusAI install --frozen-lockfile";
 var UPSTREAM_ENV_PREFIX = "MINDGENIUS_ENV_";
@@ -25289,6 +25348,8 @@ function loadConfig(env = process.env) {
     upstreamInstallCheckPath: resolve(cwd, "original-MindGeniusAI/node_modules"),
     upstreamEnv: upstreamEnvFrom(env, upstreamBaseUrl),
     upstreamHealthTimeoutMs: numberFromEnv(env.MINDGENIUS_HEALTH_TIMEOUT_MS, 30000),
+    logLevel: normalizeLogLevel(env.LOGLEVEL ?? env.LOG_LEVEL ?? env.loglevel),
+    logPath: logPathFromEnv(env.LOGPATH ?? env.LOG_PATH ?? env.logpath, cwd),
     dataDir: resolve(cwd, env.MINDMAP_DATA_DIR ?? "data"),
     allowedDocumentRoots: (env.MINDMAP_DOCUMENT_ROOTS ?? resolve(cwd, "documents")).split(",").map((root) => resolve(root.trim())).filter(Boolean),
     concurrency: {
@@ -25300,6 +25361,12 @@ function loadConfig(env = process.env) {
       maxRetries: numberFromEnv(env.MINDMAP_MAX_RETRIES, 1)
     }
   };
+}
+function logPathFromEnv(value, cwd) {
+  const logsDir = resolve(cwd, "logs");
+  if (!value?.trim())
+    return resolve(logsDir, "easter-mind-map-mcp.log");
+  return resolve(logsDir, basename(value.trim()));
 }
 function upstreamEnvFrom(env, upstreamBaseUrl) {
   const upstreamEnv = {};
@@ -25334,7 +25401,7 @@ function numberFromEnv(value, fallback) {
 
 // src/store.ts
 import { mkdir, readFile, writeFile } from "fs/promises";
-import { dirname, join } from "path";
+import { dirname as dirname2, join } from "path";
 
 class FileStore {
   filePath;
@@ -25422,7 +25489,7 @@ class FileStore {
     if (!state)
       return;
     this.writes = this.writes.then(async () => {
-      await mkdir(dirname(this.filePath), { recursive: true });
+      await mkdir(dirname2(this.filePath), { recursive: true });
       await writeFile(this.filePath, JSON.stringify(state, null, 2));
     });
     await this.writes;
@@ -26319,7 +26386,7 @@ var GUIDE = [
 
 // src/upstream/client.ts
 import { existsSync } from "fs";
-import { basename } from "path";
+import { basename as basename2 } from "path";
 
 // src/upstream/sse.ts
 var AGENT_EVENT_PREFIX = "agent:";
@@ -26385,9 +26452,10 @@ class HttpUpstreamClient {
   installCheckPath;
   upstreamEnv;
   runInstallCommand;
+  logger;
   supervisorStarted = false;
   installPromise;
-  constructor(baseUrl, startCommand, healthTimeoutMs = 30000, startUpstream = defaultStartUpstream, requestTimeoutMs = 180000, installCommand, installCheckPath, upstreamEnv = process.env, runInstallCommand = defaultRunCommand) {
+  constructor(baseUrl, startCommand, healthTimeoutMs = 30000, startUpstream = defaultStartUpstream, requestTimeoutMs = 180000, installCommand, installCheckPath, upstreamEnv = process.env, runInstallCommand = defaultRunCommand, logger) {
     this.baseUrl = baseUrl;
     this.startCommand = startCommand;
     this.healthTimeoutMs = healthTimeoutMs;
@@ -26397,24 +26465,44 @@ class HttpUpstreamClient {
     this.installCheckPath = installCheckPath;
     this.upstreamEnv = upstreamEnv;
     this.runInstallCommand = runInstallCommand;
+    this.logger = logger;
   }
   async ensureReady(signal) {
-    if (await this.isHealthy(signal))
+    this.logger?.debug("checking MindGeniusAI upstream health", { baseUrl: this.baseUrl });
+    if (await this.isHealthy(signal)) {
+      this.logger?.info("MindGeniusAI upstream is healthy", { baseUrl: this.baseUrl });
       return;
+    }
     if (this.startCommand && !this.supervisorStarted) {
       await this.ensureInstalled();
       this.supervisorStarted = true;
-      this.startUpstream(this.startCommand, { env: this.upstreamEnv });
+      this.logger?.info("starting MindGeniusAI upstream", { command: this.startCommand });
+      this.logger?.debug("MindGeniusAI upstream start environment", {
+        env: redactForLog(this.upstreamEnv)
+      });
+      this.startUpstream(this.startCommand, { env: this.upstreamEnv, logger: this.logger });
     }
     const started = Date.now();
     while (Date.now() - started < this.healthTimeoutMs) {
-      if (await this.isHealthy(signal))
+      if (await this.isHealthy(signal)) {
+        this.logger?.info("MindGeniusAI upstream became healthy", { baseUrl: this.baseUrl });
         return;
+      }
       await sleep(250, signal);
     }
+    this.logger?.error("MindGeniusAI upstream health timeout", {
+      baseUrl: this.baseUrl,
+      healthTimeoutMs: this.healthTimeoutMs
+    });
     throw new Error("MindGeniusAI upstream did not become healthy before timeout");
   }
   async runAgent({ request, signal, onEvent }) {
+    this.logger?.info("calling MindGeniusAI agent endpoint");
+    this.logger?.debug("MindGeniusAI agent request", {
+      hasFileName: Boolean(request.fileName),
+      hasMindMap: Boolean(request.mindMap),
+      messageCount: request.messages.length
+    });
     const timeoutController = new AbortController;
     const timeout = setTimeout(() => timeoutController.abort(), this.requestTimeoutMs);
     const abortFromCaller = () => timeoutController.abort();
@@ -26426,13 +26514,23 @@ class HttpUpstreamClient {
       signal: timeoutController.signal
     });
     try {
-      if (!response.ok)
+      if (!response.ok) {
+        this.logger?.error("MindGeniusAI agent endpoint failed", { status: response.status });
         throw new Error(`upstream /api/agent failed with ${response.status}`);
-      if (!response.body)
+      }
+      if (!response.body) {
+        this.logger?.error("MindGeniusAI agent endpoint returned no SSE body");
         throw new Error("upstream /api/agent returned no SSE body");
+      }
       await parseSseStream(response.body, async (envelope) => {
-        if (envelope.status === "failed")
+        this.logger?.debug("MindGeniusAI SSE envelope", {
+          hasData: Boolean(envelope.data),
+          status: envelope.status
+        });
+        if (envelope.status === "failed") {
+          this.logger?.error("MindGeniusAI SSE failed", { data: envelope.data });
           throw new Error(envelope.data ?? "upstream SSE failed");
+        }
         if (envelope.status === "done")
           return;
         if (!envelope.data)
@@ -26443,72 +26541,136 @@ class HttpUpstreamClient {
       });
       if (timeoutController.signal.aborted)
         throw new DOMException("Aborted", "AbortError");
+      this.logger?.info("MindGeniusAI agent stream completed");
     } finally {
       clearTimeout(timeout);
       signal.removeEventListener("abort", abortFromCaller);
     }
   }
   async uploadDocument(path, displayName, signal) {
+    this.logger?.info("uploading document to MindGeniusAI", { displayName, path });
     const file = Bun.file(path);
     if (await file.size > 10 * 1024 * 1024)
       throw new Error("PDF exceeds upstream 10 MB limit");
     const form = new FormData;
-    form.set("file", file, displayName ?? basename(path));
+    form.set("file", file, displayName ?? basename2(path));
     const response = await fetch(`${this.baseUrl}/api/uploadFile`, {
       method: "POST",
       body: form,
       signal
     });
-    if (!response.ok)
+    if (!response.ok) {
+      this.logger?.error("MindGeniusAI document upload failed", { status: response.status });
       throw new Error(`upstream /api/uploadFile failed with ${response.status}`);
+    }
     const body = await response.json();
-    if (!body.fileName)
+    if (!body.fileName) {
+      this.logger?.error("MindGeniusAI document upload response did not contain fileName");
       throw new Error("upstream upload response did not contain fileName");
+    }
+    this.logger?.info("document uploaded to MindGeniusAI", { fileName: body.fileName });
     return body.fileName;
   }
   async indexDocument(upstreamFileName, signal) {
+    this.logger?.info("indexing document in MindGeniusAI", { fileName: upstreamFileName });
     const response = await fetch(`${this.baseUrl}/api/document/init`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ fileName: upstreamFileName }),
       signal
     });
-    if (!response.ok)
+    if (!response.ok) {
+      this.logger?.error("MindGeniusAI document indexing failed", { status: response.status });
       throw new Error(`upstream /api/document/init failed with ${response.status}`);
+    }
+    this.logger?.info("document indexed in MindGeniusAI", { fileName: upstreamFileName });
   }
   async isHealthy(signal) {
     try {
       const response = await fetch(`${this.baseUrl}/api/health`, { signal });
+      this.logger?.debug("MindGeniusAI health response", { status: response.status });
       return response.ok;
-    } catch {
+    } catch (error2) {
+      this.logger?.debug("MindGeniusAI health check failed", { error: String(error2) });
       return false;
     }
   }
   async ensureInstalled() {
-    if (!this.installCommand)
+    if (!this.installCommand) {
+      this.logger?.debug("MindGeniusAI install skipped because no command is configured");
       return;
-    if (this.installCheckPath && existsSync(this.installCheckPath))
+    }
+    if (this.installCheckPath && existsSync(this.installCheckPath)) {
+      this.logger?.debug("MindGeniusAI install skipped because dependency marker exists", {
+        installCheckPath: this.installCheckPath
+      });
       return;
-    this.installPromise ??= this.runInstallCommand(this.installCommand, { env: this.upstreamEnv });
+    }
+    this.logger?.info("installing MindGeniusAI dependencies", { command: this.installCommand });
+    this.installPromise ??= this.runInstallCommand(this.installCommand, {
+      env: this.upstreamEnv,
+      logger: this.logger
+    });
     await this.installPromise;
+    this.logger?.info("MindGeniusAI dependencies installed");
   }
 }
 function defaultStartUpstream(command, options) {
-  Bun.spawn(command.split(/\s+/), {
-    stdout: "ignore",
-    stderr: "ignore",
-    env: options?.env
-  }).unref();
-}
-async function defaultRunCommand(command, options) {
+  const logger = options?.logger;
+  const debugOutput = logger?.level === "DEBUG";
   const process3 = Bun.spawn(command.split(/\s+/), {
-    stdout: "ignore",
-    stderr: "ignore",
+    stdout: debugOutput ? "pipe" : "ignore",
+    stderr: debugOutput ? "pipe" : "ignore",
     env: options?.env
   });
+  if (debugOutput) {
+    logProcessOutput(process3.stdout, logger, "MindGeniusAI stdout");
+    logProcessOutput(process3.stderr, logger, "MindGeniusAI stderr");
+  }
+  process3.unref();
+}
+async function defaultRunCommand(command, options) {
+  const logger = options?.logger;
+  const debugOutput = logger?.level === "DEBUG";
+  const process3 = Bun.spawn(command.split(/\s+/), {
+    stdout: debugOutput ? "pipe" : "ignore",
+    stderr: debugOutput ? "pipe" : "ignore",
+    env: options?.env
+  });
+  const outputLogs = debugOutput ? [
+    logProcessOutput(process3.stdout, logger, "MindGeniusAI install stdout"),
+    logProcessOutput(process3.stderr, logger, "MindGeniusAI install stderr")
+  ] : [];
   const exitCode = await process3.exited;
+  await Promise.all(outputLogs);
   if (exitCode !== 0)
     throw new Error(`Command failed with exit code ${exitCode}: ${command}`);
+}
+async function logProcessOutput(stream, logger, message) {
+  if (!stream)
+    return;
+  const reader = stream.getReader();
+  const decoder = new TextDecoder;
+  let buffered = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done)
+        break;
+      buffered += decoder.decode(value, { stream: true });
+      const lines = buffered.split(/\r?\n/);
+      buffered = lines.pop() ?? "";
+      for (const line of lines) {
+        if (line)
+          logger.debug(message, { line });
+      }
+    }
+    buffered += decoder.decode();
+    if (buffered)
+      logger.debug(message, { line: buffered });
+  } finally {
+    reader.releaseLock();
+  }
 }
 function sleep(ms, signal) {
   return new Promise((resolve3, reject) => {
@@ -26541,15 +26703,32 @@ var toolDescriptions = {
 // src/mcp/server.ts
 async function startStdioServer(options = {}) {
   const config2 = options.config ?? loadConfig();
-  const service = options.service ?? createDefaultService(config2);
+  const logger = options.logger ?? createLogger(config2.logLevel, config2.logPath);
+  logger.info("mcp server starting", {
+    dataDir: config2.dataDir,
+    logLevel: config2.logLevel,
+    logPath: config2.logPath,
+    upstreamBaseUrl: config2.upstreamBaseUrl
+  });
+  logger.debug("mcp server config", {
+    allowedDocumentRoots: config2.allowedDocumentRoots,
+    concurrency: config2.concurrency,
+    upstreamEnv: redactForLog(config2.upstreamEnv),
+    upstreamInstallCheckPath: config2.upstreamInstallCheckPath,
+    upstreamInstallCommand: config2.upstreamInstallCommand,
+    upstreamStartCommand: config2.upstreamStartCommand
+  });
+  const service = options.service ?? createDefaultService(config2, logger);
   const server = options.server ?? createMcpServer();
   await service.recoverPendingRuns();
+  logger.info("pending runs recovered");
   registerTools(server, service);
   registerResources(server, service);
   await server.connect(options.transport ?? createStdioTransport());
+  logger.info("mcp server connected");
 }
-function createDefaultService(config2) {
-  const { store, upstream } = makeDefaultComponents(config2);
+function createDefaultService(config2, logger) {
+  const { store, upstream } = makeDefaultComponents(config2, logger);
   return new MindMapService(store, upstream, config2);
 }
 function createMcpServer() {
@@ -26563,10 +26742,10 @@ function createMcpServer() {
 function createStdioTransport() {
   return new StdioServerTransport;
 }
-function makeDefaultComponents(config2) {
+function makeDefaultComponents(config2, logger) {
   return {
     store: new FileStore(config2.dataDir),
-    upstream: new HttpUpstreamClient(config2.upstreamBaseUrl, config2.upstreamStartCommand, config2.upstreamHealthTimeoutMs, undefined, config2.concurrency.upstreamRequestTimeoutMs, config2.upstreamInstallCommand, config2.upstreamInstallCheckPath, config2.upstreamEnv)
+    upstream: new HttpUpstreamClient(config2.upstreamBaseUrl, config2.upstreamStartCommand, config2.upstreamHealthTimeoutMs, undefined, config2.concurrency.upstreamRequestTimeoutMs, config2.upstreamInstallCommand, config2.upstreamInstallCheckPath, config2.upstreamEnv, undefined, logger)
   };
 }
 function registerTools(server, service) {

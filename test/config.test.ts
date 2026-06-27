@@ -11,6 +11,8 @@ describe('server configuration', () => {
     expect(config.upstreamEnv.PORT).toBe('8787')
     expect(config.upstreamEnv.COREPACK_ENABLE_STRICT).toBe('0')
     expect(config.upstreamEnv.COREPACK_ENABLE_PROJECT_SPEC).toBe('0')
+    expect(config.logLevel).toBe('NONE')
+    expect(config.logPath.endsWith('/logs/easter-mind-map-mcp.log')).toBe(true)
   })
 
   it('allows the upstream start command to be overridden', () => {
@@ -36,5 +38,11 @@ describe('server configuration', () => {
 
   it('falls back to the default upstream port when base URL parsing fails', () => {
     expect(loadConfig({ MINDGENIUS_BASE_URL: 'not a url' }).upstreamEnv.PORT).toBe('8787')
+  })
+
+  it('reads logging level and path from env while keeping logs inside the project logs dir', () => {
+    const config = loadConfig({ loglevel: 'debug', logpath: '/tmp/custom.log' })
+    expect(config.logLevel).toBe('DEBUG')
+    expect(config.logPath.endsWith('/logs/custom.log')).toBe(true)
   })
 })

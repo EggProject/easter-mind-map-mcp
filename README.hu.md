@@ -37,6 +37,8 @@ Ha az upstream még nem healthy, az adapter automatikusan elindítja a bundled
 paranccsal.
 A MindGeniusAI provider változókat, például `MINDGENIUS_ENV_LLM_PROVIDER` és
 `MINDGENIUS_ENV_MINIMAX_API_KEY`, az MCP host env-jében add meg.
+A logolás alapból ki van kapcsolva `LOGLEVEL=NONE` értékkel; `LOGLEVEL=DEBUG`
+esetén részletes adapter és MindGeniusAI szerverkimenet íródik a `logs/` alá.
 
 Az MCP host bekötéséhez, az upstream beállításához és a kötelező tool flow-hoz
 használd az alább szétbontott dokumentációt, ne ezt az egy fájlt.

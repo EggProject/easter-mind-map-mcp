@@ -13,6 +13,8 @@ paths resolve from the process working directory.
 | `MINDGENIUS_START_COMMAND`     | `pnpm --dir original-MindGeniusAI dev:server`                | Command used to start the upstream if health checks fail.                                 |
 | `MINDGENIUS_INSTALL_COMMAND`   | `pnpm --dir original-MindGeniusAI install --frozen-lockfile` | Command used once when bundled upstream dependencies are missing.                         |
 | `MINDGENIUS_HEALTH_TIMEOUT_MS` | `30000`                                                      | Maximum wait time for the upstream health check after startup.                            |
+| `LOGLEVEL`                     | `NONE`                                                       | File logging level: `NONE`, `ERROR`, `WARN`, `INFO`, or `DEBUG`.                          |
+| `LOGPATH`                      | `logs/easter-mind-map-mcp.log`                               | Log file name or path. The adapter keeps it inside the project `logs/` directory.         |
 | `MINDMAP_DATA_DIR`             | `data`                                                       | Local persistence directory for plans, runs, documents, exports, and idempotency records. |
 | `MINDMAP_DOCUMENT_ROOTS`       | `documents`                                                  | Comma-separated list of directories from which local PDF documents may be uploaded.       |
 | `MINDMAP_MAX_RUNS_GLOBAL`      | `4`                                                          | Global concurrent generation run limit.                                                   |
@@ -25,6 +27,11 @@ paths resolve from the process working directory.
 
 `MINDMAP_DATA_DIR` stores adapter-owned state. Keep it writable by the MCP
 server process and do not use it for source files.
+
+`LOGPATH` writes under the project `logs/` directory, which is ignored by git.
+Logging is disabled by default with `LOGLEVEL=NONE`. Use `LOGLEVEL=DEBUG` when
+you need detailed MCP adapter events and the bundled MindGeniusAI server
+stdout/stderr output.
 
 `MINDMAP_DOCUMENT_ROOTS` limits which local PDFs can be uploaded through
 `mindmap_document_add`. Paths outside these roots are rejected before they reach

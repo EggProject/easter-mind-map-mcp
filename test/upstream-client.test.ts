@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'bun:test'
+import { createLogger } from '../src/logger'
 import { HttpUpstreamClient } from '../src/upstream/client'
 
 const originalFetch = globalThis.fetch
@@ -46,6 +48,65 @@ describe('HTTP upstream client SSE hygiene', () => {
 
     await client.ensureReady()
     expect(healthChecks).toBe(2)
+  })
+
+  it('logs default install command output at DEBUG level', async () => {
+    let healthChecks = 0
+    globalThis.fetch = (async () => {
+      healthChecks += 1
+      return new Response(null, { status: healthChecks === 1 ? 503 : 200 })
+    }) as unknown as typeof fetch
+    const dataDir = await mkdtemp(join(tmpdir(), 'mindmap-debug-install-'))
+    const logPath = join(dataDir, 'logs', 'runtime.log')
+    const logger = createLogger('DEBUG', logPath)
+
+    const client = new HttpUpstreamClient(
+      'http://upstream.test',
+      'true',
+      1_000,
+      undefined,
+      180_000,
+      'bun -e console.log("install-output")',
+      join(dataDir, 'missing-node-modules'),
+      { PATH: process.env.PATH ?? '' },
+      undefined,
+      logger,
+    )
+
+    await client.ensureReady()
+    const output = readFileSync(logPath, 'utf8')
+    expect(output).toContain('MindGeniusAI install stdout {"line":"install-output"}')
+  })
+
+  it('logs default supervisor stdout and stderr at DEBUG level', async () => {
+    let healthChecks = 0
+    globalThis.fetch = (async () => {
+      healthChecks += 1
+      return new Response(null, { status: healthChecks === 1 ? 503 : 200 })
+    }) as unknown as typeof fetch
+    const dataDir = await mkdtemp(join(tmpdir(), 'mindmap-debug-start-'))
+    const logPath = join(dataDir, 'logs', 'runtime.log')
+    const logger = createLogger('DEBUG', logPath)
+
+    const client = new HttpUpstreamClient(
+      'http://upstream.test',
+      'bun -e console.log("server-output"),console.error("server-error")',
+      1_000,
+      undefined,
+      180_000,
+      undefined,
+      undefined,
+      { PATH: process.env.PATH ?? '' },
+      undefined,
+      logger,
+    )
+
+    await client.ensureReady()
+    await eventually(() => {
+      const output = readFileSync(logPath, 'utf8')
+      expect(output).toContain('MindGeniusAI stdout {"line":"server-output"}')
+      expect(output).toContain('MindGeniusAI stderr {"line":"server-error"}')
+    })
   })
 
   it('installs missing upstream dependencies and forwards env before starting', async () => {

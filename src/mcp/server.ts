@@ -2,11 +2,13 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { loadConfig } from '../config'
+import { createLogger, redactForLog } from '../logger'
 import { FileStore } from '../store'
 import { MindMapService } from '../service'
 import { HttpUpstreamClient } from '../upstream/client'
 import { toolDescriptions } from './toolDescriptions'
 import type { ServerConfig } from '../config'
+import type { Logger } from '../logger'
 import type { Store } from '../store'
 import type { UpstreamClient } from '../types'
 
@@ -17,20 +19,38 @@ export interface StdioServerOptions {
   service?: MindMapService
   server?: RuntimeServer
   transport?: StdioServerTransport
+  logger?: Logger
 }
 
 export async function startStdioServer(options: StdioServerOptions = {}): Promise<void> {
   const config = options.config ?? loadConfig()
-  const service = options.service ?? createDefaultService(config)
+  const logger = options.logger ?? createLogger(config.logLevel, config.logPath)
+  logger.info('mcp server starting', {
+    dataDir: config.dataDir,
+    logLevel: config.logLevel,
+    logPath: config.logPath,
+    upstreamBaseUrl: config.upstreamBaseUrl,
+  })
+  logger.debug('mcp server config', {
+    allowedDocumentRoots: config.allowedDocumentRoots,
+    concurrency: config.concurrency,
+    upstreamEnv: redactForLog(config.upstreamEnv),
+    upstreamInstallCheckPath: config.upstreamInstallCheckPath,
+    upstreamInstallCommand: config.upstreamInstallCommand,
+    upstreamStartCommand: config.upstreamStartCommand,
+  })
+  const service = options.service ?? createDefaultService(config, logger)
   const server = options.server ?? createMcpServer()
   await service.recoverPendingRuns()
+  logger.info('pending runs recovered')
   registerTools(server, service)
   registerResources(server, service)
   await server.connect(options.transport ?? createStdioTransport())
+  logger.info('mcp server connected')
 }
 
-export function createDefaultService(config: ServerConfig): MindMapService {
-  const { store, upstream } = makeDefaultComponents(config)
+export function createDefaultService(config: ServerConfig, logger?: Logger): MindMapService {
+  const { store, upstream } = makeDefaultComponents(config, logger)
   return new MindMapService(store, upstream, config)
 }
 
@@ -51,7 +71,10 @@ export function createStdioTransport(): StdioServerTransport {
   return new StdioServerTransport()
 }
 
-export function makeDefaultComponents(config: ServerConfig): {
+export function makeDefaultComponents(
+  config: ServerConfig,
+  logger?: Logger,
+): {
   store: Store
   upstream: UpstreamClient
 } {
@@ -66,6 +89,8 @@ export function makeDefaultComponents(config: ServerConfig): {
       config.upstreamInstallCommand,
       config.upstreamInstallCheckPath,
       config.upstreamEnv,
+      undefined,
+      logger,
     ),
   }
 }
