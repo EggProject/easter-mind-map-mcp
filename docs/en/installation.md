@@ -14,22 +14,19 @@
 bun install
 ```
 
-Run the verification commands before wiring the server into an MCP host:
+Run the server directly from the committed runtime artifact:
 
 ```bash
-bun test
-bun run build
-bun run format:check
+bun dist/index.js
 ```
 
-`bun run build` type-checks the project and writes the MCP runtime entrypoint to
-`dist/index.js`. Configure MCP hosts to run the built `dist` file, not the
-TypeScript source file.
+The repository commits `dist/index.js`. Configure MCP hosts to run that file,
+not the TypeScript source file. You only need `bun run build` when developing
+against changed source files and refreshing `dist/index.js`.
 
 ## Run the MCP server directly
 
 ```bash
-bun run build
 bun dist/index.js
 ```
 
@@ -58,7 +55,8 @@ Use the repository root as the working directory so relative paths such as
 }
 ```
 
-Re-run `bun run build` after each source change before restarting the MCP host.
+During your own development, re-run `bun run build` after each source change
+before restarting the MCP host.
 
 If the upstream is not already running, set `MINDGENIUS_START_COMMAND` to a
 command that starts it. The adapter checks `/api/health` before each upstream

@@ -14,22 +14,20 @@
 bun install
 ```
 
-Az MCP hostba kötés előtt futtasd az ellenőrző parancsokat:
+Futtasd a szervert közvetlenül a commitolt runtime artifactból:
 
 ```bash
-bun test
-bun run build
-bun run format:check
+bun dist/index.js
 ```
 
-A `bun run build` type-checket futtat, majd a MCP runtime entrypointot a
-`dist/index.js` fájlba írja. Az MCP hostokat a buildelt `dist` fájlra
-konfiguráld, ne a TypeScript forrásfájlra.
+A repo commitolja a `dist/index.js` fájlt. Az MCP hostokat erre a fájlra
+konfiguráld, ne a TypeScript forrásfájlra. A `bun run build` csak saját
+fejlesztéskor kell, amikor forrásmódosítás után frissíted a `dist/index.js`
+fájlt.
 
 ## MCP szerver közvetlen futtatása
 
 ```bash
-bun run build
 bun dist/index.js
 ```
 
@@ -58,8 +56,8 @@ A repo gyökerét add meg working directoryként, hogy a relatív utak, példáu
 }
 ```
 
-Minden forrásmódosítás után futtasd újra a `bun run build` parancsot, mielőtt
-újraindítod az MCP hostot.
+Saját fejlesztés közben minden forrásmódosítás után futtasd újra a
+`bun run build` parancsot, mielőtt újraindítod az MCP hostot.
 
 Ha az upstream még nem fut, állítsd be a `MINDGENIUS_START_COMMAND` változót
 arra a parancsra, amely elindítja. Az adapter minden upstream futás előtt

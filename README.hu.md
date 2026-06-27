@@ -27,9 +27,11 @@ környezeti változókkal beállított MindGeniusAI HTTP/SSE upstreamet hív.
 
 ```bash
 bun install
-bun run build
 bun dist/index.js
 ```
+
+A commitolt `dist/index.js` az MCP hostok runtime entrypointja. Fordítani csak
+akkor kell, ha saját fejlesztés közben TypeScript forrásfájlokat módosítasz.
 
 Az MCP host bekötéséhez, az upstream beállításához és a kötelező tool flow-hoz
 használd az alább szétbontott dokumentációt, ne ezt az egy fájlt.
@@ -53,6 +55,7 @@ Meglévő mérnöki jegyzetek:
 
 ```text
 src/                    MCP szerver, service rétegek, tárolás, export, upstream kliens
+dist/                   Commitolt MCP runtime entrypoint host konfigurációhoz
 test/                   Bun tesztek service viselkedésre és MCP stdio integrációra
 docs/                   Felhasználói dokumentáció, szerződések, ADR-ek, tervezési jegyzetek
 original-MindGeniusAI/  Upstream MindGeniusAI alkalmazas snapshot
@@ -60,13 +63,13 @@ original-MindGeniusAI/  Upstream MindGeniusAI alkalmazas snapshot
 
 ## Scriptek
 
-| Parancs                | Cél                                                |
-| ---------------------- | -------------------------------------------------- |
-| `bun test`             | Bun tesztcsomag futtatása.                         |
-| `bun run build`        | Type-check futtatása és `dist/index.js` készítése. |
-| `bun run lint`         | ESLint futtatása.                                  |
-| `bun run format:check` | Prettier formátumellenőrzés.                       |
-| `bun run format`       | Illeszkedő fájlok formázása Prettierrel.           |
+| Parancs                | Cél                                                             |
+| ---------------------- | --------------------------------------------------------------- |
+| `bun test`             | Bun tesztcsomag futtatása.                                      |
+| `bun run build`        | Csak fejlesztéshez: type-check és a `dist/index.js` frissítése. |
+| `bun run lint`         | ESLint futtatása.                                               |
+| `bun run format:check` | Prettier formátumellenőrzés.                                    |
+| `bun run format`       | Illeszkedő fájlok formázása Prettierrel.                        |
 
 ## Licenc
 

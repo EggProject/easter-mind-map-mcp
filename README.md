@@ -27,9 +27,11 @@ calls a MindGeniusAI HTTP/SSE upstream configured with environment variables.
 
 ```bash
 bun install
-bun run build
 bun dist/index.js
 ```
+
+The committed `dist/index.js` is the runtime entrypoint for MCP hosts. Build from
+source only when you change the TypeScript files during your own development.
 
 For MCP host setup, upstream configuration, and the required tool flow, use the
 split documentation below instead of keeping everything in this file.
@@ -53,6 +55,7 @@ Existing engineering notes:
 
 ```text
 src/                    MCP server, service layer, storage, exports, upstream client
+dist/                   Committed MCP runtime entrypoint for host configuration
 test/                   Bun tests for service behavior and MCP stdio integration
 docs/                   User documentation, contracts, ADRs, and planning notes
 original-MindGeniusAI/  Upstream MindGeniusAI application snapshot
@@ -60,13 +63,13 @@ original-MindGeniusAI/  Upstream MindGeniusAI application snapshot
 
 ## Scripts
 
-| Command                | Purpose                                           |
-| ---------------------- | ------------------------------------------------- |
-| `bun test`             | Run the Bun test suite.                           |
-| `bun run build`        | Type-check the project and write `dist/index.js`. |
-| `bun run lint`         | Run ESLint.                                       |
-| `bun run format:check` | Check Prettier formatting.                        |
-| `bun run format`       | Format matched files with Prettier.               |
+| Command                | Purpose                                                          |
+| ---------------------- | ---------------------------------------------------------------- |
+| `bun test`             | Run the Bun test suite.                                          |
+| `bun run build`        | Development only: type-check source and refresh `dist/index.js`. |
+| `bun run lint`         | Run ESLint.                                                      |
+| `bun run format:check` | Check Prettier formatting.                                       |
+| `bun run format`       | Format matched files with Prettier.                              |
 
 ## License
 
