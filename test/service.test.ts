@@ -13,6 +13,7 @@ class FakeUpstream implements UpstreamClient {
   indexCalls = 0
   requests: RunAgentOptions['request'][] = []
   fail = false
+  failIndex = false
   delayMs = 0
   cleanCloseOnAbort = false
 
@@ -48,6 +49,7 @@ class FakeUpstream implements UpstreamClient {
   async indexDocument(): Promise<void> {
     this.indexCalls += 1
     await delay(20)
+    if (this.failIndex) throw new Error('index boom')
   }
 }
 
@@ -168,6 +170,40 @@ describe('mind map service', () => {
     expect(secondEvents.text).toContain(second.planningId)
   })
 
+  it('lists plans for one owner with resource URIs', async () => {
+    const { service } = await makeService()
+    const created = await service.create({ ownerId: 'u1', prompt: 'A' })
+    await service.create({ ownerId: 'u2', prompt: 'B' })
+
+    const plans = await service.list('u1')
+    expect(plans).toHaveLength(1)
+    expect(plans[0]).toMatchObject({
+      planningId: created.planningId,
+      resourceUri: `mindmap://plans/${created.planningId}`,
+    })
+  })
+
+  it('summarizes plans without a committed mind map', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'mindmap-summary-'))
+    const store = new FileStore(dataDir)
+    const now = new Date().toISOString()
+    await store.savePlan({
+      id: 'plan_empty',
+      ownerId: 'u1',
+      status: 'queued',
+      version: 0,
+      messages: [],
+      metadata: {},
+      createdAt: now,
+      updatedAt: now,
+    })
+    const service = new MindMapService(store, new FakeUpstream(), makeConfig(dataDir))
+
+    expect((await service.getResult('u1', 'plan_empty', 'summary')).summary).toBe(
+      'queued plan version 0; 0 mind-map node(s).',
+    )
+  })
+
   it('does not commit failed partial run snapshots over the last completed version', async () => {
     const { service, upstream } = await makeService()
     const created = await service.create({ ownerId: 'u1', prompt: 'A' })
@@ -225,6 +261,38 @@ describe('mind map service', () => {
       service.documentIndex('u1', added.documentId),
     ])
     expect(upstream.indexCalls).toBe(1)
+  })
+
+  it('rejects unindexed documents during creation and reports indexing failures', async () => {
+    const { service, upstream, dataDir } = await makeService()
+    const added = await service.documentAdd({
+      ownerId: 'u1',
+      source: { type: 'local_path', path: join(dataDir, 'a.pdf') },
+    })
+
+    await expect(
+      service.create({ ownerId: 'u1', prompt: 'Use doc', documentId: added.documentId }),
+    ).rejects.toThrow('document must be indexed')
+
+    upstream.failIndex = true
+    await expect(service.documentIndex('u1', added.documentId)).rejects.toThrow('index boom')
+    expect(
+      (await service.documentIndex('u1', added.documentId).catch((error) => error)).message,
+    ).toBe('index boom')
+  })
+
+  it('returns indexed immediately for an already indexed document', async () => {
+    const { service, dataDir } = await makeService()
+    const added = await service.documentAdd({
+      ownerId: 'u1',
+      source: { type: 'local_path', path: join(dataDir, 'a.pdf') },
+    })
+    await service.documentIndex('u1', added.documentId)
+
+    expect(await service.documentIndex('u1', added.documentId)).toEqual({
+      documentId: added.documentId,
+      status: 'indexed',
+    })
   })
 })
 

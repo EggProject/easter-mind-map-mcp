@@ -4,6 +4,7 @@ import { decodeAgentEvent, parseSseStream } from '../src/upstream/sse'
 describe('upstream SSE parser', () => {
   it('decodes agent-prefixed events and ignores legacy payloads', () => {
     expect(decodeAgentEvent('agent:{"type":"step-finish"}')).toEqual({ type: 'step-finish' })
+    expect(decodeAgentEvent('agent:{bad json')).toBeNull()
     expect(decodeAgentEvent('plain token')).toBeNull()
   })
 
@@ -24,5 +25,23 @@ describe('upstream SSE parser', () => {
       statuses.push(envelope.status)
     })
     expect(statuses).toEqual(['pending', 'done'])
+  })
+
+  it('parses trailing frames and ignores malformed frame data', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode('data: not-json\n\ndata: {"status":"done","data":"tail"}'),
+        )
+        controller.close()
+      },
+    })
+    const envelopes: unknown[] = []
+
+    await parseSseStream(stream, (envelope) => {
+      envelopes.push(envelope)
+    })
+
+    expect(envelopes).toEqual([{ status: 'done', data: 'tail' }])
   })
 })

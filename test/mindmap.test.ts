@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { applyOps, buildMindMap, reduceAgentEvent } from '../src/mindmap'
+import { applyOps, buildMindMap, outlineToMarkdown, reduceAgentEvent } from '../src/mindmap'
 import type { ReducedRun } from '../src/mindmap'
 
 describe('mind map parser and reducer', () => {
@@ -16,10 +16,44 @@ describe('mind map parser and reducer', () => {
       applyOps(outline, [
         { op: 'add', parentId: 'root', label: 'B' },
         { op: 'update', id: 'a', label: 'A2' },
+        { op: 'update', id: 'missing', label: 'ignored' },
+        { op: 'update', id: 'a', label: ' ' },
         { op: 'remove', id: 'missing' },
       ]),
     ).toBe(2)
     expect(outline.children?.map((child) => child.label)).toEqual(['A2', 'B'])
+
+    expect(applyOps(outline, [{ op: 'remove', id: 'a' }])).toBe(1)
+    expect(outline.children?.map((child) => child.label)).toEqual(['B'])
+
+    const oneChild = { id: 'root', label: 'Root', children: [{ id: 'only', label: 'Only' }] }
+    expect(applyOps(oneChild, [{ op: 'remove', id: 'only' }])).toBe(1)
+    expect(oneChild.children).toBeUndefined()
+  })
+
+  it('handles fallback markdown shapes and output depth', () => {
+    const plain = buildMindMap('Plain root')
+    expect(plain?.label).toBe('Plain root')
+
+    const multipleRoots = buildMindMap('# Root\n# Sibling')
+    expect(multipleRoots?.children?.[0]?.label).toBe('Sibling')
+
+    const longLabel = 'x'.repeat(250)
+    expect(buildMindMap(longLabel)?.label).toHaveLength(200)
+
+    expect(
+      outlineToMarkdown({
+        id: 'root',
+        label: 'Root',
+        children: [
+          {
+            id: 'branch',
+            label: 'Branch',
+            children: [{ id: 'leaf', label: 'Leaf' }],
+          },
+        ],
+      }),
+    ).toBe('# Root\n## Branch\n- Leaf')
   })
 
   it('handles every documented event type', () => {

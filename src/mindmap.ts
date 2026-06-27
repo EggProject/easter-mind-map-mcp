@@ -79,14 +79,10 @@ export function buildMindMap(markdown: string): MindMapOutline | null {
     first.children.push(...rest)
     outline = stripDepth(first)
   } else {
-    const items = lines
-      .map((line) => /^[-*]\s+(.+)$/.exec(line.trim())?.[1])
-      .filter((value): value is string => Boolean(value))
     const label = clampLabel(firstPlainText ?? 'Mind map')
     outline = {
       id: newNodeId(),
       label,
-      children: items.map((item) => ({ id: newNodeId(), label: clampLabel(item) })),
     }
   }
   return clampTree(outline, 0, { count: 1 })

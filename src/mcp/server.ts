@@ -6,21 +6,36 @@ import { FileStore } from '../store'
 import { MindMapService } from '../service'
 import { HttpUpstreamClient } from '../upstream/client'
 import { toolDescriptions } from './toolDescriptions'
+import type { ServerConfig } from '../config'
+import type { Store } from '../store'
+import type { UpstreamClient } from '../types'
 
-export async function startStdioServer(): Promise<void> {
-  const config = loadConfig()
-  const service = new MindMapService(
-    new FileStore(config.dataDir),
-    new HttpUpstreamClient(
-      config.upstreamBaseUrl,
-      config.upstreamStartCommand,
-      config.upstreamHealthTimeoutMs,
-      undefined,
-      config.concurrency.upstreamRequestTimeoutMs,
-    ),
-    config,
-  )
-  const server = new McpServer(
+type RuntimeServer = Pick<McpServer, 'connect' | 'registerResource' | 'registerTool'>
+
+export interface StdioServerOptions {
+  config?: ServerConfig
+  service?: MindMapService
+  server?: RuntimeServer
+  transport?: StdioServerTransport
+}
+
+export async function startStdioServer(options: StdioServerOptions = {}): Promise<void> {
+  const config = options.config ?? loadConfig()
+  const service = options.service ?? createDefaultService(config)
+  const server = options.server ?? createMcpServer()
+  await service.recoverPendingRuns()
+  registerTools(server, service)
+  registerResources(server, service)
+  await server.connect(options.transport ?? createStdioTransport())
+}
+
+export function createDefaultService(config: ServerConfig): MindMapService {
+  const { store, upstream } = makeDefaultComponents(config)
+  return new MindMapService(store, upstream, config)
+}
+
+export function createMcpServer(): McpServer {
+  return new McpServer(
     {
       name: 'easter-mind-map-mcp',
       version: '0.1.0',
@@ -30,13 +45,32 @@ export async function startStdioServer(): Promise<void> {
         'This server manages persistent MindGeniusAI mind-map plans. Always call mindmap_create first, preserve returned IDs exactly, poll with mindmap_get_status, fetch result only when needed, and finish with mindmap_export using opml and png.',
     },
   )
-  await service.recoverPendingRuns()
-  registerTools(server, service)
-  registerResources(server, service)
-  await server.connect(new StdioServerTransport())
 }
 
-function registerTools(server: McpServer, service: MindMapService): void {
+export function createStdioTransport(): StdioServerTransport {
+  return new StdioServerTransport()
+}
+
+export function makeDefaultComponents(config: ServerConfig): {
+  store: Store
+  upstream: UpstreamClient
+} {
+  return {
+    store: new FileStore(config.dataDir),
+    upstream: new HttpUpstreamClient(
+      config.upstreamBaseUrl,
+      config.upstreamStartCommand,
+      config.upstreamHealthTimeoutMs,
+      undefined,
+      config.concurrency.upstreamRequestTimeoutMs,
+    ),
+  }
+}
+
+export function registerTools(
+  server: Pick<McpServer, 'registerTool'>,
+  service: MindMapService,
+): void {
   const ownerId = 'local'
   server.registerTool(
     'mindmap_create',
@@ -209,7 +243,10 @@ function artifactMimeType(format: 'opml' | 'png' | 'markdown'): string {
   return 'text/x-opml'
 }
 
-function registerResources(server: McpServer, service: MindMapService): void {
+export function registerResources(
+  server: Pick<McpServer, 'registerResource'>,
+  service: MindMapService,
+): void {
   const ownerId = 'local'
   const read = async (uri: URL) => {
     const resource = await service.readResource(ownerId, uri.toString())

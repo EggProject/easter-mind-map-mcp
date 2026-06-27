@@ -5,7 +5,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ['original-MindGeniusAI/**', 'docs/plan/**', 'node_modules/**', 'data/**'],
+    ignores: ['original-MindGeniusAI/**', 'docs/plan/**', 'node_modules/**', 'data/**', 'dist/**'],
   },
   {
     files: ['src/**/*.ts', 'test/**/*.ts'],

@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "bun test ./test/*.test.ts"
+    "test": "bun test ./test/*.test.ts",
+    "coverage": "bun scripts/check-coverage.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.0",
