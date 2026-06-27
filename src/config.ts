@@ -59,6 +59,8 @@ function upstreamEnvFrom(
     }
   }
   upstreamEnv.PORT ??= portFromUrl(upstreamBaseUrl)
+  upstreamEnv.COREPACK_ENABLE_STRICT ??= '0'
+  upstreamEnv.COREPACK_ENABLE_PROJECT_SPEC ??= '0'
   return upstreamEnv
 }
 

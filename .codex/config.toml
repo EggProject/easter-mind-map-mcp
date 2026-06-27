@@ -1,0 +1,19 @@
+[mcp_servers.easter-mind-map]
+command = "bun"
+args = ["dist/index.js"]
+cwd = "."
+
+[mcp_servers.easter-mind-map.env]
+MINDGENIUS_ENV_LLM_PROVIDER = "minimax"
+MINDGENIUS_ENV_MINIMAX_MODEL = "MiniMax-M3"
+MINDMAP_DATA_DIR = "data"
+MINDMAP_DOCUMENT_ROOTS = "documents"
+
+[mcp_servers.easter-mind-map.tools.mindmap_guide]
+approval_mode = "approve"
+
+[mcp_servers.easter-mind-map.tools.mindmap_create]
+approval_mode = "approve"
+
+[mcp_servers.easter-mind-map.tools.mindmap_get_status]
+approval_mode = "approve"

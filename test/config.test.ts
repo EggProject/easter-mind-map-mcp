@@ -9,6 +9,8 @@ describe('server configuration', () => {
       'pnpm --dir original-MindGeniusAI install --frozen-lockfile',
     )
     expect(config.upstreamEnv.PORT).toBe('8787')
+    expect(config.upstreamEnv.COREPACK_ENABLE_STRICT).toBe('0')
+    expect(config.upstreamEnv.COREPACK_ENABLE_PROJECT_SPEC).toBe('0')
   })
 
   it('allows the upstream start command to be overridden', () => {
