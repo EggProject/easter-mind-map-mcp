@@ -11,6 +11,13 @@
 
 ## Függőségek telepítése
 
+Meglévő checkout esetén először húzd le a legfrissebb commitolt runtime
+artifactot:
+
+```bash
+git pull
+```
+
 ```bash
 bun install
 ```

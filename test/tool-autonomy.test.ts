@@ -15,6 +15,10 @@ describe('tool autonomy wording', () => {
     expect(GUIDE).toContain('mindmap_get_status')
     expect(GUIDE).toContain('mindmap_get_result')
     expect(GUIDE).toContain("mindmap_export(planningId, formats:['opml','png'])")
+    expect(GUIDE).toContain('Document-grounded flow')
+    expect(GUIDE).toContain('mindmap_document_add')
+    expect(GUIDE).toContain('mindmap_document_index')
+    expect(GUIDE).toContain('Never invent')
   })
 
   it('each tool description contains use, do-not, and next-action guidance', () => {

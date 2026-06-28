@@ -3,7 +3,13 @@
 🇬🇧 **[English version ->](../en/tool-reference.md)**
 
 Ez az oldal összefoglalja a stdio szerver által exponált MCP toolokat. A pontos
-LLM-facing szöveg a `src/mcp/toolDescriptions.ts` fájlban él.
+LLM-facing szöveg a `src/mcp/toolDescriptions.ts` fájlban él, a paraméter
+promptok pedig a `src/mcp/server.ts` fájlban vannak.
+
+A tool- és paraméterleírások a promptfelület részei. Úgy vannak megírva, hogy a
+host pontosan őrizze meg a visszakapott ID-kat, terminális státuszig polloljon,
+kerülje a nem biztonságos dokumentumbemenetet, és sikeres mapnél OPML + PNG
+exporttal zárjon.
 
 ## Toolok
 
@@ -19,6 +25,19 @@ LLM-facing szöveg a `src/mcp/toolDescriptions.ts` fájlban él.
 | `mindmap_document_index` | Feltöltött PDF inicializálása az upstream RAG indexben.                            |
 | `mindmap_export`         | Commitolt tervverzió exportálása OPML, PNG vagy Markdown formátumba.               |
 | `mindmap_guide`          | Determinisztikus tool-használati recept visszaadása a hostnak.                     |
+
+## Paraméter prompt szabályok
+
+- A `planningId`, `runId`, `documentId`, `resourceUri` és `version` értékek tool
+  eredményből jönnek, és byte-pontosan meg kell őrizni őket.
+- A `prompt` a felhasználói célt és map-korlátokat hordozza; nem API kulcs vagy
+  host konfiguráció helye.
+- A `documentId` csak akkor érvényes `mindmap_create` híváshoz, ha előtte a
+  `mindmap_document_add` és a `mindmap_document_index` is sikeres volt.
+- A `mindmap_document_add` `source.path` értéke allowed document root alatti
+  lokális PDF út legyen. URL, base64, nyers byte és secret nem elfogadott.
+- A `formats` elhagyható a kötelező alapértelmezett `["opml", "png"]`
+  exporthoz; `markdown` csak akkor kell, ha tényleg hasznos.
 
 ## Fő erőforrások
 

@@ -26,7 +26,17 @@ környezeti változókkal beállított MindGeniusAI HTTP/SSE upstreamet hív.
 
 ## Gyors kezdés
 
+Telepítsd mindkét runtime eszközt, mielőtt MCP hostba kötöd a szervert:
+
+- Bun `>=1.3.0` futtatja ezt az adaptert és a `dist/index.js` entrypointot.
+- A pnpm legyen elérhető a `PATH`-on, mert a bundled `original-MindGeniusAI`
+  upstream ezt használja az automatikus installhoz/indításhoz.
+
+A repo checkoutban frissítsd a commitolt runtime artifactot, majd telepítsd a
+függőségeket:
+
 ```bash
+git pull
 bun install
 bun dist/index.js
 ```
@@ -42,6 +52,9 @@ A változóknak a `bun dist/index.js` process indulásakor kell látszaniuk. A
 `~/.zshrc` jellegű shell startup fájlok csak akkor elegendők, ha maga az MCP
 host is abból a shell sessionből indult; különben tedd a változókat az MCP host
 `env` blokkjába.
+Lásd az [MCP host bekötést](docs/hu/installation.md) és a
+[környezeti változók listáját](docs/hu/configuration.md) a teljes beállítási
+blokkhoz.
 A logolás alapból ki van kapcsolva `EASTER_MIND_MAP_MCP_LOGLEVEL=NONE`
 értékkel; `EASTER_MIND_MAP_MCP_LOGLEVEL=DEBUG` esetén részletes adapter és
 MindGeniusAI szerverkimenet íródik alapértelmezetten ide:

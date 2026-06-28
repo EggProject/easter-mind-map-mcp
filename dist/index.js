@@ -26166,12 +26166,50 @@ function exportSnapshotKey(planningId, version2) {
   return `${planningId}/${version2}`;
 }
 var GUIDE = [
-  "1) Call mindmap_create(prompt[, documentId]) to start a new in-memory plan, then preserve the returned planningId exactly.",
-  "2) Repeat mindmap_get_status(planningId) until status is completed or failed.",
-  "3) To refine an existing map, call mindmap_continue(planningId, instruction), then return to step 2.",
-  "4) Call mindmap_get_result(planningId, format:'outline'|'markdown') only when the current or final map is needed.",
-  "5) REQUIRED FINISH: call mindmap_export(planningId, formats:['opml','png']).",
-  "Rule: never invent or alter planningId, runId, or documentId values."
+  "# MindGeniusAI MCP Tool Guide",
+  "",
+  "Follow this recipe when using the easter-mind-map-mcp tools. Tool names, arguments, and returned IDs are part of the control flow; do not replace them with prose.",
+  "",
+  "## Non-negotiable rules",
+  "",
+  "- Preserve every returned planningId, runId, documentId, resourceUri, and version exactly. Never invent, shorten, translate, or reformat IDs.",
+  "- For a new map, always start with mindmap_create. For a refinement, reuse the existing planningId with mindmap_continue.",
+  "- Poll with mindmap_get_status until status is completed, failed, or cancelled. Do not assume completion from a queued or running status.",
+  "- Use mindmap_get_result only when map content is needed for the user answer or for validation.",
+  "- Every successful completed map must finish with mindmap_export(planningId, formats:['opml','png']).",
+  "- Treat OPML and PNG exports as resource links. Read export resources only when bytes/text are explicitly needed.",
+  "",
+  "## Standard map flow",
+  "",
+  "1. Call mindmap_create({ prompt }) with the user goal/topic.",
+  "2. Save the returned planningId exactly.",
+  "3. Repeat mindmap_get_status({ planningId }) while status is queued or running.",
+  "4. If status is failed or cancelled, stop the flow and report that terminal status with the error if present.",
+  "5. If status is completed, optionally call mindmap_get_result({ planningId, format:'outline'|'markdown'|'summary' }) when content inspection is useful.",
+  "6. Required finish: call mindmap_export(planningId, formats:['opml','png']).",
+  "7. Return the export resource links and a concise result summary.",
+  "",
+  "## Document-grounded flow",
+  "",
+  '1. Call mindmap_document_add({ source:{ type:"local_path", path } }) for a local PDF under an allowed document root.',
+  "2. Save the returned documentId exactly.",
+  "3. Call mindmap_document_index({ documentId }) and wait for success.",
+  "4. Call mindmap_create({ prompt, documentId }) using that exact indexed documentId.",
+  "5. Continue with the standard status/result/export flow.",
+  "",
+  "## Refinement flow",
+  "",
+  "1. Call mindmap_continue({ planningId, instruction }) with the exact existing planningId.",
+  "2. Poll mindmap_get_status({ planningId }) until completed, failed, or cancelled.",
+  "3. Inspect with mindmap_get_result only if needed.",
+  "4. Required finish after a successful refinement: mindmap_export(planningId, formats:['opml','png']).",
+  "",
+  "## Tool selection hints",
+  "",
+  "- mindmap_list: use when the user asks what plans exist or does not provide a planningId.",
+  "- mindmap_cancel: use only when the user asks to stop queued/running work.",
+  "- mindmap_get_result: content inspection; not polling and not final export.",
+  "- mindmap_export: final artifact creation; default formats are OPML and PNG."
 ].join(`
 `);
 
@@ -26520,17 +26558,68 @@ function sleep(ms, signal) {
 }
 
 // src/mcp/toolDescriptions.ts
+var prompt = (parts) => parts.join(" ");
 var toolDescriptions = {
-  mindmap_create: "Create a new in-memory MindGeniusAI mind-map plan and queue the first generation run. Use this first for a new requested map. Do not wait inside the tool for generation to finish. Next action: call mindmap_get_status with the returned planningId.",
-  mindmap_continue: "Continue an existing in-memory plan with a new instruction, using the previous messages and current mindMap state. Use only after mindmap_create has returned a planningId. Do not start concurrent continuations for the same planningId. Next action: call mindmap_get_status.",
-  mindmap_get_status: "Return short progress metadata for a plan. Use this for polling. Do not use it to fetch the full map or event log. Next action: poll again, call mindmap_get_result if completed, or report the failure.",
-  mindmap_get_result: "Return the current or final mind-map result in outline, markdown, or summary form. Use after status is completed or when the current snapshot is explicitly needed. Do not use this for polling. Next action: call mindmap_export for OPML and PNG.",
-  mindmap_cancel: "Cancel a queued or running plan run and abort the upstream HTTP/SSE stream. Use when the user asks to stop generation. Do not treat cancellation as a successful export. Next action: call mindmap_get_status if confirmation is needed.",
-  mindmap_list: "List the caller-owned plans with short metadata. Use when the user asks what plans exist. Do not expose another owner\u2019s plans. Next action: choose a planningId and call mindmap_get_status or mindmap_get_result.",
-  mindmap_document_add: "Register a local PDF document and upload it to MindGeniusAI for later RAG use. Use before mindmap_document_index. Do not pass arbitrary URLs or large base64 content through the LLM context. Next action: call mindmap_document_index with the returned documentId.",
-  mindmap_document_index: "Initialize the uploaded PDF document in the upstream RAG index. Use after mindmap_document_add and before mindmap_create with documentId. Do not start duplicate indexing for the same documentId. Next action: call mindmap_create with documentId.",
-  mindmap_export: "Create versioned export resource links for a committed plan version. Use as the required final step after a map is complete. Do not return OPML or PNG inline; the resource read calls MindGeniusAI export lazily. Next action: read the returned resources only when needed.",
-  mindmap_guide: "Return the deterministic AI-readable recipe for using this MCP server correctly. Use when tool order is uncertain. Do not replace the actual tool calls with a prose answer. Next action: follow the recipe through mindmap_export."
+  mindmap_create: prompt([
+    "Create a new in-memory MindGeniusAI mind-map plan and queue the first generation run.",
+    "Use this first for every new user request that needs a generated mind map; include documentId only after a document was added and indexed.",
+    "Do not invent a planningId, do not call continue/status/result/export before this returns, and do not wait inside this tool for generation to finish.",
+    "Next action: preserve the returned planningId exactly, then call mindmap_get_status with that planningId."
+  ]),
+  mindmap_continue: prompt([
+    "Queue a refinement run for an existing plan, using the stored messages and current mindMap state.",
+    "Use this only when the user asks to modify or improve a plan that already has a planningId.",
+    "Do not create a new plan, do not start concurrent continuations for the same planningId, and do not alter the planningId.",
+    "Next action: call mindmap_get_status with the same planningId until the refinement reaches a terminal status."
+  ]),
+  mindmap_get_status: prompt([
+    "Return compact progress metadata for one plan without loading the full map or event log.",
+    "Use this repeatedly after mindmap_create or mindmap_continue while status is queued or running.",
+    "Do not use this to inspect map content, do not assume completion before a completed status, and do not stop polling on queued/running unless the user cancels.",
+    "Next action: poll again if queued/running, call mindmap_get_result if completed and content is needed, or report the error if failed/cancelled."
+  ]),
+  mindmap_get_result: prompt([
+    "Return the current or final mind-map content as outline, markdown, or summary.",
+    "Use this after status is completed, or earlier only when the user explicitly asks to inspect the current snapshot.",
+    "Do not use this for polling, do not use it as an export substitute, and do not request large content unless it is needed for the answer.",
+    'Next action: when the map is ready, call mindmap_export with formats ["opml","png"] before final delivery.'
+  ]),
+  mindmap_cancel: prompt([
+    "Cancel queued or running work for an existing plan and abort the upstream HTTP/SSE stream when possible.",
+    "Use this when the user asks to stop, abort, cancel, or discard an active generation/refinement run.",
+    "Do not treat cancellation as a successful map, do not export a cancelled unfinished run, and do not cancel other planningId values.",
+    "Next action: call mindmap_get_status with the same planningId if confirmation is needed, then report the cancelled status."
+  ]),
+  mindmap_list: prompt([
+    "List caller-owned plans with short metadata only.",
+    "Use this when the user asks what mind-map plans exist, asks to resume one, or did not provide a planningId.",
+    "Do not expose another owner's plans, do not use list as a content fetch, and do not guess which planningId the user meant when multiple plans match.",
+    "Next action: choose the relevant planningId with the user or context, then call mindmap_get_status or mindmap_get_result."
+  ]),
+  mindmap_document_add: prompt([
+    "Register a local PDF and upload it to MindGeniusAI so a later mind-map plan can use it for RAG.",
+    "Use this before document indexing when the user wants the map grounded in a local PDF file.",
+    "Do not pass URLs, raw file bytes, base64 content, secrets, or paths outside the configured document roots.",
+    "Next action: preserve the returned documentId exactly, then call mindmap_document_index with that documentId."
+  ]),
+  mindmap_document_index: prompt([
+    "Initialize a previously uploaded PDF in the upstream RAG index.",
+    "Use this after mindmap_document_add and before mindmap_create when the plan should use the document.",
+    "Do not index arbitrary IDs, do not start duplicate indexing for the same documentId, and do not call mindmap_create with documentId until indexing succeeds.",
+    "Next action: call mindmap_create with the exact indexed documentId and the user's mind-map prompt."
+  ]),
+  mindmap_export: prompt([
+    "Create versioned export resource links for a completed or otherwise committed plan version.",
+    "Use this as the required final step for a successful map; request both opml and png unless the user explicitly asks for a different additional format.",
+    "Do not return OPML or PNG inline, do not export before a mindMap exists, and do not omit png/opml from a normal completed flow.",
+    "Next action: return the resource links to the user and read individual resources only when their bytes or text are needed."
+  ]),
+  mindmap_guide: prompt([
+    "Return the deterministic AI-readable recipe for using this MCP server correctly from start to export.",
+    "Use this when tool order, required IDs, document flow, polling, or final export requirements are uncertain.",
+    "Do not replace the actual tool calls with a prose answer and do not skip the recipe's required export finish.",
+    "Next action: follow the returned recipe exactly, ending successful map generation with mindmap_export."
+  ])
 };
 
 // src/mcp/server.ts
@@ -26570,7 +26659,7 @@ function createMcpServer() {
     name: "easter-mind-map-mcp",
     version: "0.1.0"
   }, {
-    instructions: "This server manages in-memory MindGeniusAI mind-map plans. Always call mindmap_create first, preserve returned IDs exactly, poll with mindmap_get_status, fetch result only when needed, and finish with mindmap_export using opml and png."
+    instructions: "This MCP server manages in-memory MindGeniusAI mind-map plans. For a new map, call mindmap_create first, preserve returned planningId/runId/documentId values exactly, poll mindmap_get_status until a terminal status, inspect content only when needed with mindmap_get_result, and finish every successful map with mindmap_export using both opml and png. If a local PDF is needed, call mindmap_document_add, then mindmap_document_index, then mindmap_create with the indexed documentId. Use mindmap_guide whenever the correct tool order is uncertain."
   });
 }
 function createStdioTransport() {
@@ -26587,38 +26676,38 @@ function registerTools(server, service) {
   server.registerTool("mindmap_create", {
     description: toolDescriptions.mindmap_create,
     inputSchema: {
-      prompt: exports_external.string().min(1).describe("The user goal/topic to turn into a mind map."),
-      documentId: exports_external.string().optional().describe("Previously uploaded and indexed documentId for RAG."),
-      initialMindMap: exports_external.any().optional().describe("Optional current outline to continue from."),
-      idempotencyKey: exports_external.string().optional().describe("Stable caller key that prevents duplicate plans."),
-      metadata: exports_external.record(exports_external.string()).optional().describe("Small caller metadata, not secrets.")
+      prompt: exports_external.string().min(1).describe("Required. The user goal, topic, or task to turn into a mind map. Pass the user intent directly and keep constraints that affect the map structure."),
+      documentId: exports_external.string().optional().describe("Optional. Exact documentId returned by mindmap_document_add and successfully initialized by mindmap_document_index. Do not invent or edit it."),
+      initialMindMap: exports_external.any().optional().describe("Optional. Existing outline object to seed the first run when the caller already has structured mind-map state. Omit for normal new plans."),
+      idempotencyKey: exports_external.string().optional().describe("Optional. Stable caller-provided key for retrying the same create request without duplicate plans. Reuse only for the same user intent."),
+      metadata: exports_external.record(exports_external.string()).optional().describe("Optional. Small non-secret caller metadata for tracing. Do not put API keys, credentials, or large content here.")
     }
   }, async (input) => json(await service.create({ ownerId, ...input })));
   server.registerTool("mindmap_continue", {
     description: toolDescriptions.mindmap_continue,
     inputSchema: {
-      planningId: exports_external.string().describe("Existing planningId returned by mindmap_create."),
-      instruction: exports_external.string().min(1).describe("New refinement instruction for the existing plan."),
-      idempotencyKey: exports_external.string().optional().describe("Stable caller key that prevents duplicate runs.")
+      planningId: exports_external.string().describe("Required. Exact planningId returned by mindmap_create for the plan being refined. Preserve it byte-for-byte."),
+      instruction: exports_external.string().min(1).describe("Required. User refinement instruction for the existing plan, such as add, remove, reorganize, translate, or expand nodes."),
+      idempotencyKey: exports_external.string().optional().describe("Optional. Stable caller-provided key for retrying the same refinement without duplicate runs. Reuse only for the same instruction.")
     }
   }, async (input) => json(await service.continue({ ownerId, ...input })));
   server.registerTool("mindmap_get_status", {
     description: toolDescriptions.mindmap_get_status,
     inputSchema: {
-      planningId: exports_external.string().describe("Existing planningId to poll.")
+      planningId: exports_external.string().describe("Required. Exact planningId to poll after create or continue. Do not substitute runId or documentId.")
     }
   }, async ({ planningId }) => json(await service.getStatus(ownerId, planningId)));
   server.registerTool("mindmap_get_result", {
     description: toolDescriptions.mindmap_get_result,
     inputSchema: {
-      planningId: exports_external.string().describe("Existing planningId to read."),
-      format: exports_external.enum(["outline", "markdown", "summary"]).optional().describe("Result representation.")
+      planningId: exports_external.string().describe("Required. Exact planningId whose current or completed map should be read."),
+      format: exports_external.enum(["outline", "markdown", "summary"]).optional().describe("Optional. Choose outline for structured JSON, markdown for readable map text, or summary for a compact status-style answer. Default is summary.")
     }
   }, async ({ planningId, format }) => json(await service.getResult(ownerId, planningId, format)));
   server.registerTool("mindmap_cancel", {
     description: toolDescriptions.mindmap_cancel,
     inputSchema: {
-      planningId: exports_external.string().describe("Existing planningId to cancel.")
+      planningId: exports_external.string().describe("Required. Exact planningId whose queued or running work should be cancelled.")
     }
   }, async ({ planningId }) => json(await service.cancel(ownerId, planningId)));
   server.registerTool("mindmap_list", {
@@ -26628,21 +26717,24 @@ function registerTools(server, service) {
   server.registerTool("mindmap_document_add", {
     description: toolDescriptions.mindmap_document_add,
     inputSchema: {
-      source: exports_external.object({ type: exports_external.literal("local_path"), path: exports_external.string() }),
-      displayName: exports_external.string().optional()
+      source: exports_external.object({
+        type: exports_external.literal("local_path").describe("Required. Only local_path is supported; do not pass URLs or inline data."),
+        path: exports_external.string().min(1).describe("Required. Local PDF path under an allowed document root. Do not pass remote URLs, base64, or secret material.")
+      }).describe("Required. Local PDF source descriptor for document upload."),
+      displayName: exports_external.string().optional().describe("Optional. Human-readable document label for later selection. Omit when the file name is sufficient.")
     }
   }, async (input) => json(await service.documentAdd({ ownerId, ...input })));
   server.registerTool("mindmap_document_index", {
     description: toolDescriptions.mindmap_document_index,
     inputSchema: {
-      documentId: exports_external.string()
+      documentId: exports_external.string().describe("Required. Exact documentId returned by mindmap_document_add. Preserve it byte-for-byte and index it before using it in mindmap_create.")
     }
   }, async ({ documentId }) => json(await service.documentIndex(ownerId, documentId)));
   server.registerTool("mindmap_export", {
     description: toolDescriptions.mindmap_export,
     inputSchema: {
-      planningId: exports_external.string(),
-      formats: exports_external.array(exports_external.enum(["opml", "png", "markdown"])).optional()
+      planningId: exports_external.string().describe("Required. Exact planningId for the completed or committed plan version to export."),
+      formats: exports_external.array(exports_external.enum(["opml", "png", "markdown"])).optional().describe('Optional. Export formats to create resource links for. Omit for the required default ["opml","png"]; include markdown only when specifically useful.')
     }
   }, async ({ planningId, formats }) => {
     const result = await service.export(ownerId, planningId, formats);
@@ -26694,7 +26786,7 @@ function registerResources(server, service) {
   server.registerResource("mindmap_guide", "mindmap://guide", {
     title: "Mind-map tool flow guide",
     mimeType: "text/markdown",
-    description: "AI-readable recipe for using the MindGeniusAI MCP tools."
+    description: "AI-readable prompt recipe for tool order, ID preservation, polling, document flow, and required OPML+PNG export."
   }, read);
   server.registerResource("mindmap_plan", new ResourceTemplate("mindmap://plans/{planningId}", { list: undefined }), { title: "Mind-map plan", mimeType: "application/json" }, read);
   server.registerResource("mindmap_plan_outline", new ResourceTemplate("mindmap://plans/{planningId}/outline", { list: undefined }), { title: "Mind-map outline", mimeType: "application/json" }, read);

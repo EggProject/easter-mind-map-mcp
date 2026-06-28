@@ -11,6 +11,12 @@
 
 ## Install dependencies
 
+For an existing checkout, pull the latest committed runtime artifact first:
+
+```bash
+git pull
+```
+
 ```bash
 bun install
 ```

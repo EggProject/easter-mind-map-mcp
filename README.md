@@ -25,7 +25,17 @@ calls a MindGeniusAI HTTP/SSE upstream configured with environment variables.
 
 ## Quick start
 
+Install both runtime tools before wiring the server into an MCP host:
+
+- Bun `>=1.3.0` runs this adapter and executes `dist/index.js`.
+- pnpm must be available on `PATH` because the bundled `original-MindGeniusAI`
+  upstream uses it for automatic install/start.
+
+In the repository checkout, update the committed runtime artifact and install
+dependencies:
+
 ```bash
+git pull
 bun install
 bun dist/index.js
 ```
@@ -41,6 +51,9 @@ They must be visible to the `bun dist/index.js` process when it starts. Shell
 startup files such as `~/.zshrc` only work when the MCP host itself was launched
 from that shell session; otherwise put the variables in the MCP host `env`
 block.
+See [MCP host setup](docs/en/installation.md#configure-an-mcp-host) and the
+[environment variable reference](docs/en/configuration.md#environment-variables)
+for the complete settings block.
 Logging is off by default with `EASTER_MIND_MAP_MCP_LOGLEVEL=NONE`; set
 `EASTER_MIND_MAP_MCP_LOGLEVEL=DEBUG` to write detailed adapter and MindGeniusAI
 server output to `/tmp/easter-mind-map-mcp/logs/mcp.log` by default.

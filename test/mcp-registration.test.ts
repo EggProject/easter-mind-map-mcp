@@ -15,14 +15,20 @@ import type { MindMapService } from '../src/service'
 
 type ToolHandler = (input: Record<string, unknown>) => Promise<unknown>
 type ResourceHandler = (uri: URL) => Promise<unknown>
+type ToolRegistrationOptions = {
+  description?: string
+  inputSchema?: Record<string, { description?: string }>
+}
 
 class FakeRuntimeServer {
   connected = false
   readonly tools = new Map<string, ToolHandler>()
+  readonly toolOptions = new Map<string, unknown>()
   readonly resources: Array<{ name: string; handler: ResourceHandler }> = []
 
-  registerTool(name: string, _options: unknown, handler: any): any {
+  registerTool(name: string, options: unknown, handler: any): any {
     this.tools.set(name, handler as ToolHandler)
+    this.toolOptions.set(name, options)
     return {}
   }
 
@@ -212,6 +218,21 @@ describe('MCP server registration', () => {
     const fakeServer = new FakeRuntimeServer()
     registerTools(fakeServer, new FakeService() as unknown as MindMapService)
     expect(fakeServer.tools.size).toBe(10)
+    const createOptions = fakeServer.toolOptions.get('mindmap_create') as ToolRegistrationOptions
+    expect(createOptions.description).toContain('Next action')
+    expect(createOptions.inputSchema?.prompt.description).toContain('Required')
+    expect(createOptions.inputSchema?.prompt.description).toContain('user goal')
+    expect(createOptions.inputSchema?.documentId.description).toContain('mindmap_document_index')
+    const statusOptions = fakeServer.toolOptions.get(
+      'mindmap_get_status',
+    ) as ToolRegistrationOptions
+    expect(statusOptions.inputSchema?.planningId.description).toContain('Do not substitute runId')
+    const documentAddOptions = fakeServer.toolOptions.get(
+      'mindmap_document_add',
+    ) as ToolRegistrationOptions
+    expect(documentAddOptions.inputSchema?.source.description).toContain('Local PDF')
+    const exportOptions = fakeServer.toolOptions.get('mindmap_export') as ToolRegistrationOptions
+    expect(exportOptions.inputSchema?.formats.description).toContain('["opml","png"]')
   })
 })
 
