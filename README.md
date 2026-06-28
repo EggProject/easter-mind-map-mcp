@@ -1,6 +1,6 @@
 # easter-mind-map-mcp
 
-> Persistent MCP adapter for MindGeniusAI mind-map generation, refinement, resources, and exports.
+> In-memory MCP adapter for MindGeniusAI mind-map generation, refinement, resources, and exports.
 
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](package.json)
 [![Runtime](https://img.shields.io/badge/runtime-Bun%20%3E%3D1.3.0-black.svg)](package.json)
@@ -15,10 +15,10 @@
 ## What is this?
 
 **`easter-mind-map-mcp`** is a Bun and TypeScript MCP server that wraps the
-MindGeniusAI upstream application behind persistent, host-friendly tools. It
-stores plan state locally, supervises queued runs, preserves stable IDs, exposes
-MCP resources for plan data, and exports finished maps as OPML, PNG, or
-Markdown.
+MindGeniusAI upstream application behind host-friendly tools. It keeps plan
+state in memory for the current MCP process, supervises queued runs, preserves
+stable IDs during that process, exposes MCP resources for plan data, and exports
+finished maps as OPML, PNG, or Markdown through lazy resource reads.
 
 The server speaks MCP over stdio. It does not expose an HTTP API of its own; it
 calls a MindGeniusAI HTTP/SSE upstream configured with environment variables.
@@ -35,14 +35,15 @@ source only when you change the TypeScript files during your own development.
 When the upstream is not already healthy, the adapter starts the bundled
 `original-MindGeniusAI` server automatically with `pnpm --dir
 original-MindGeniusAI dev:server`.
-Set MindGeniusAI provider variables such as `MINDGENIUS_ENV_LLM_PROVIDER` and
-`MINDGENIUS_ENV_MINIMAX_API_KEY` in the MCP host environment.
+Set MindGeniusAI provider variables such as `EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_LLM_PROVIDER` and
+`EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_API_KEY` in the MCP host environment.
 They must be visible to the `bun dist/index.js` process when it starts. Shell
 startup files such as `~/.zshrc` only work when the MCP host itself was launched
 from that shell session; otherwise put the variables in the MCP host `env`
 block.
-Logging is off by default with `LOGLEVEL=NONE`; set `LOGLEVEL=DEBUG` to write
-detailed adapter and MindGeniusAI server output under `logs/`.
+Logging is off by default with `EASTER_MIND_MAP_MCP_LOGLEVEL=NONE`; set
+`EASTER_MIND_MAP_MCP_LOGLEVEL=DEBUG` to write detailed adapter and MindGeniusAI
+server output to `/tmp/easter-mind-map-mcp/logs/mcp.log` by default.
 
 For MCP host setup, upstream configuration, and the required tool flow, use the
 split documentation below instead of keeping everything in this file.
@@ -65,7 +66,7 @@ Existing engineering notes:
 ## Project layout
 
 ```text
-src/                    MCP server, service layer, storage, exports, upstream client
+src/                    MCP server, service layer, memory store, exports, upstream client
 dist/                   Committed MCP runtime entrypoint for host configuration
 test/                   Bun tests for service behavior and MCP stdio integration
 docs/                   User documentation, contracts, ADRs, and planning notes

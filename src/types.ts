@@ -103,6 +103,12 @@ export interface RunAgentOptions {
 export interface UpstreamClient {
   ensureReady(signal?: AbortSignal): Promise<void>
   runAgent(options: RunAgentOptions): Promise<void>
+  exportMindMap(options: {
+    mindMap: MindMapOutline
+    markdown?: string
+    formats: Array<'opml' | 'png' | 'markdown'>
+    signal?: AbortSignal
+  }): Promise<ExportArtifact[]>
   uploadDocument(path: string, displayName?: string, signal?: AbortSignal): Promise<string>
   indexDocument(upstreamFileName: string, signal?: AbortSignal): Promise<void>
 }

@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { loadConfig } from '../config'
 import { createLogger, redactForLog } from '../logger'
-import { FileStore } from '../store'
+import { MemoryStore } from '../store'
 import { MindMapService } from '../service'
 import { HttpUpstreamClient } from '../upstream/client'
 import { toolDescriptions } from './toolDescriptions'
@@ -38,11 +38,12 @@ export async function startStdioServer(options: StdioServerOptions = {}): Promis
     upstreamInstallCheckPath: config.upstreamInstallCheckPath,
     upstreamInstallCommand: config.upstreamInstallCommand,
     upstreamStartCommand: config.upstreamStartCommand,
+    upstreamWorkingDirectory: config.upstreamWorkingDirectory,
   })
   const service = options.service ?? createDefaultService(config, logger)
   const server = options.server ?? createMcpServer()
-  await service.recoverPendingRuns()
-  logger.info('pending runs recovered')
+  const recovered = await service.recoverPendingRuns()
+  logger.info('pending runs recovered', { recovered })
   registerTools(server, service)
   registerResources(server, service)
   await server.connect(options.transport ?? createStdioTransport())
@@ -62,7 +63,7 @@ export function createMcpServer(): McpServer {
     },
     {
       instructions:
-        'This server manages persistent MindGeniusAI mind-map plans. Always call mindmap_create first, preserve returned IDs exactly, poll with mindmap_get_status, fetch result only when needed, and finish with mindmap_export using opml and png.',
+        'This server manages in-memory MindGeniusAI mind-map plans. Always call mindmap_create first, preserve returned IDs exactly, poll with mindmap_get_status, fetch result only when needed, and finish with mindmap_export using opml and png.',
     },
   )
 }
@@ -79,7 +80,7 @@ export function makeDefaultComponents(
   upstream: UpstreamClient
 } {
   return {
-    store: new FileStore(config.dataDir),
+    store: new MemoryStore(),
     upstream: new HttpUpstreamClient(
       config.upstreamBaseUrl,
       config.upstreamStartCommand,
@@ -91,6 +92,7 @@ export function makeDefaultComponents(
       config.upstreamEnv,
       undefined,
       logger,
+      config.upstreamWorkingDirectory,
     ),
   }
 }
@@ -240,7 +242,7 @@ export function exportToolResult(
         uri: string
         name: string
         title: string
-        size: number
+        size?: number
         mimeType: string
       }
   >
@@ -248,19 +250,21 @@ export function exportToolResult(
   const artifacts = result.artifacts as Array<{
     format: 'opml' | 'png' | 'markdown'
     resourceUri: string
-    bytes: number
+    bytes?: number
   }>
   return {
     content: [
       { type: 'text', text: JSON.stringify(result, null, 2) },
-      ...artifacts.map((artifact) => ({
-        type: 'resource_link' as const,
-        uri: artifact.resourceUri,
-        name: `${planningId}-${artifact.format}`,
-        title: `Mind-map ${artifact.format.toUpperCase()} export`,
-        size: artifact.bytes,
-        mimeType: artifactMimeType(artifact.format),
-      })),
+      ...artifacts.map((artifact) => {
+        const link = {
+          type: 'resource_link' as const,
+          uri: artifact.resourceUri,
+          name: `${planningId}-${artifact.format}`,
+          title: `Mind-map ${artifact.format.toUpperCase()} export`,
+          mimeType: artifactMimeType(artifact.format),
+        }
+        return artifact.bytes === undefined ? link : { ...link, size: artifact.bytes }
+      }),
     ],
   }
 }
@@ -322,7 +326,9 @@ export function registerResources(
   )
   server.registerResource(
     'mindmap_export',
-    new ResourceTemplate('mindmap://exports/{planningId}/{format}', { list: undefined }),
+    new ResourceTemplate('mindmap://exports/{planningId}/{version}/{format}', {
+      list: undefined,
+    }),
     { title: 'Mind-map export artifact' },
     read,
   )

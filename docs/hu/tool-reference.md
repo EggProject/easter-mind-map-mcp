@@ -9,7 +9,7 @@ LLM-facing szöveg a `src/mcp/toolDescriptions.ts` fájlban él.
 
 | Tool                     | Hasznalat                                                                          |
 | ------------------------ | ---------------------------------------------------------------------------------- |
-| `mindmap_create`         | Perzisztens terv létrehozása és az első generálási futás sorba állítása.           |
+| `mindmap_create`         | Memóriában tartott terv létrehozása és az első generálási futás sorba állítása.    |
 | `mindmap_continue`       | Finomítási instrukció hozzáadása egy meglévő tervhez.                              |
 | `mindmap_get_status`     | Rovid progress metadata polling egy tervhez.                                       |
 | `mindmap_get_result`     | Aktuális vagy végső map olvasása `outline`, `markdown` vagy `summary` formátumban. |
@@ -22,15 +22,15 @@ LLM-facing szöveg a `src/mcp/toolDescriptions.ts` fájlban él.
 
 ## Fő erőforrások
 
-| URI                                     | Tartalom                               |
-| --------------------------------------- | -------------------------------------- |
-| `mindmap://guide`                       | Tool-használati útmutató Markdownként. |
-| `mindmap://plans/{planningId}`          | Tarolt terv JSON.                      |
-| `mindmap://plans/{planningId}/outline`  | Aktuális outline JSON.                 |
-| `mindmap://plans/{planningId}/markdown` | Aktuális map Markdown.                 |
-| `mindmap://plans/{planningId}/events`   | Eseménynapló NDJSON-ként.              |
-| `mindmap://exports/{planningId}/opml`   | OPML export.                           |
-| `mindmap://exports/{planningId}/png`    | PNG export.                            |
+| URI                                             | Tartalom                               |
+| ----------------------------------------------- | -------------------------------------- |
+| `mindmap://guide`                               | Tool-használati útmutató Markdownként. |
+| `mindmap://plans/{planningId}`                  | Tarolt terv JSON.                      |
+| `mindmap://plans/{planningId}/outline`          | Aktuális outline JSON.                 |
+| `mindmap://plans/{planningId}/markdown`         | Aktuális map Markdown.                 |
+| `mindmap://plans/{planningId}/events`           | Eseménynapló NDJSON-ként.              |
+| `mindmap://exports/{planningId}/{version}/opml` | Lazy módon generált OPML export.       |
+| `mindmap://exports/{planningId}/{version}/png`  | Lazy módon generált PNG export.        |
 
 ## Végső lépés szabály
 
@@ -41,4 +41,5 @@ mindmap_export({ planningId, formats: ["opml", "png"] })
 ```
 
 A `mindmap_get_result` a map tartalmának megtekintésére való; a
-`mindmap_export` a leadható artifactokat hozza létre.
+`mindmap_export` verziózott resource linkeket hoz létre. Ezek olvasásakor hívja
+az MCP a MindGeniusAI exportot.

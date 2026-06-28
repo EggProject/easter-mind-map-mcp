@@ -1,4 +1,3 @@
-import { exportMarkdown, exportOpml, exportPng } from './export'
 import { newId, nowIso } from './ids'
 import { cloneOutline, reduceAgentEvent } from './mindmap'
 import type { ReducedRun } from './mindmap'
@@ -9,7 +8,6 @@ import type { Store } from './store'
 import type {
   AgentEvent,
   AgentMessage,
-  ExportArtifact,
   MindMapDocument,
   MindMapPlan,
   MindMapRun,
@@ -20,6 +18,10 @@ import type {
 export class MindMapService {
   private readonly queue: RunQueue
   private readonly documentLocks = new Set<string>()
+  private readonly exportSnapshots = new Map<
+    string,
+    { planningId: string; version: number; mindMap: MindMapOutline; markdown?: string }
+  >()
 
   constructor(
     private readonly store: Store,
@@ -213,34 +215,7 @@ export class MindMapService {
   }
 
   async recoverPendingRuns(): Promise<number> {
-    let recovered = 0
-    const plans = await this.store.listAllPlans()
-    for (const plan of plans) {
-      const runs = await this.store.listRuns(plan.id)
-      const pendingRuns = runs.filter((run) => ['queued', 'running'].includes(run.status))
-      if (pendingRuns.length === 0) continue
-      if (plan.status === 'running') {
-        await this.store.savePlan({ ...plan, status: 'queued', updatedAt: nowIso() })
-      }
-      for (const run of pendingRuns) {
-        const queuedRun: MindMapRun = {
-          ...run,
-          status: 'queued',
-          startedAt: undefined,
-          completedAt: undefined,
-          error: undefined,
-        }
-        await this.store.saveRun(queuedRun)
-        this.queue.enqueue({
-          ownerId: queuedRun.ownerId,
-          planningId: queuedRun.planningId,
-          runId: queuedRun.id,
-          execute: (signal) => this.executeRun(queuedRun.id, signal),
-        })
-        recovered += 1
-      }
-    }
-    return recovered
+    return 0
   }
 
   async documentAdd(input: {
@@ -298,15 +273,17 @@ export class MindMapService {
   ): Promise<Record<string, unknown>> {
     const plan = assertPlanOwner(await this.store.getPlan(planningId), ownerId)
     if (!plan.mindMap) throw new Error('plan has no mind map to export')
+    this.exportSnapshots.set(exportSnapshotKey(planningId, plan.version), {
+      planningId,
+      version: plan.version,
+      mindMap: cloneOutline(plan.mindMap),
+      markdown: plan.markdown,
+    })
     const artifacts = []
     for (const format of formats) {
-      const artifact = makeArtifact(plan, format)
-      const key = `${planningId}/${format}`
-      await this.store.saveExport(key, artifact)
       artifacts.push({
         format,
-        resourceUri: `mindmap://exports/${planningId}/${format}`,
-        bytes: artifact.bytes,
+        resourceUri: `mindmap://exports/${planningId}/${plan.version}/${format}`,
       })
     }
     return { planningId, version: plan.version, artifacts }
@@ -325,8 +302,18 @@ export class MindMapService {
     if (parsed.kind === 'guide') return { uri, mimeType: 'text/markdown', text: GUIDE }
     if (parsed.kind === 'export') {
       assertPlanOwner(await this.store.getPlan(parsed.planningId), ownerId)
-      const artifact = await this.store.getExport(`${parsed.planningId}/${parsed.format}`)
-      if (!artifact) throw new Error('export artifact not found; call mindmap_export first')
+      const snapshot = this.exportSnapshots.get(
+        exportSnapshotKey(parsed.planningId, parsed.version),
+      )
+      if (!snapshot) throw new Error('export snapshot not found; call mindmap_export first')
+      await this.upstream.ensureReady()
+      const [artifact] = await this.upstream.exportMindMap({
+        mindMap: snapshot.mindMap,
+        markdown: snapshot.markdown,
+        formats: [parsed.format],
+      })
+      if (!artifact?.dataBase64)
+        throw new Error(`upstream export response missing ${parsed.format}`)
       return { uri, mimeType: artifact.mediaType, blob: artifact.dataBase64 }
     }
     const plan = assertPlanOwner(await this.store.getPlan(parsed.planningId), ownerId)
@@ -445,33 +432,6 @@ export class MindMapService {
   }
 }
 
-function makeArtifact(plan: MindMapPlan, format: 'opml' | 'png' | 'markdown'): ExportArtifact {
-  if (!plan.mindMap) throw new Error('missing mind map')
-  const createdAt = nowIso()
-  if (format === 'png') {
-    const data = exportPng(plan.mindMap)
-    return {
-      planningId: plan.id,
-      version: plan.version,
-      format,
-      mediaType: 'image/png',
-      bytes: data.byteLength,
-      dataBase64: Buffer.from(data).toString('base64'),
-      createdAt,
-    }
-  }
-  const text = format === 'opml' ? exportOpml(plan.mindMap) : exportMarkdown(plan.mindMap)
-  return {
-    planningId: plan.id,
-    version: plan.version,
-    format,
-    mediaType: format === 'opml' ? 'text/x-opml' : 'text/markdown',
-    bytes: new TextEncoder().encode(text).byteLength,
-    dataBase64: Buffer.from(text).toString('base64'),
-    createdAt,
-  }
-}
-
 function summarize(plan: MindMapPlan): string {
   const nodeCount = countNodes(plan.mindMap)
   return `${plan.status} plan version ${plan.version}; ${nodeCount} mind-map node(s).`
@@ -500,7 +460,7 @@ function planUri(planningId: string): string {
 type ParsedResource =
   | { kind: 'guide' }
   | { kind: 'plan' | 'outline' | 'markdown' | 'events'; planningId: string }
-  | { kind: 'export'; planningId: string; format: 'opml' | 'png' | 'markdown' }
+  | { kind: 'export'; planningId: string; version: number; format: 'opml' | 'png' | 'markdown' }
 
 function parseMindmapUri(uri: string): ParsedResource | null {
   if (uri === 'mindmap://guide') return { kind: 'guide' }
@@ -511,19 +471,24 @@ function parseMindmapUri(uri: string): ParsedResource | null {
       planningId: planMatch[1],
     }
   }
-  const exportMatch = /^mindmap:\/\/exports\/([^/]+)\/(opml|png|markdown)$/u.exec(uri)
+  const exportMatch = /^mindmap:\/\/exports\/([^/]+)\/(\d+)\/(opml|png|markdown)$/u.exec(uri)
   if (exportMatch) {
     return {
       kind: 'export',
       planningId: exportMatch[1],
-      format: exportMatch[2] as 'opml' | 'png' | 'markdown',
+      version: Number(exportMatch[2]),
+      format: exportMatch[3] as 'opml' | 'png' | 'markdown',
     }
   }
   return null
 }
 
+function exportSnapshotKey(planningId: string, version: number): string {
+  return `${planningId}/${version}`
+}
+
 export const GUIDE = [
-  '1) Call mindmap_create(prompt[, documentId]) to start a new persistent plan, then preserve the returned planningId exactly.',
+  '1) Call mindmap_create(prompt[, documentId]) to start a new in-memory plan, then preserve the returned planningId exactly.',
   '2) Repeat mindmap_get_status(planningId) until status is completed or failed.',
   '3) To refine an existing map, call mindmap_continue(planningId, instruction), then return to step 2.',
   "4) Call mindmap_get_result(planningId, format:'outline'|'markdown') only when the current or final map is needed.",

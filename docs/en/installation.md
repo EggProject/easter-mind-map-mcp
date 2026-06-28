@@ -47,12 +47,11 @@ Use the repository root as the working directory so relative paths such as
       "args": ["dist/index.js"],
       "cwd": "/absolute/path/to/easter-mind-map-mcp",
       "env": {
-        "MINDGENIUS_BASE_URL": "http://127.0.0.1:8787",
-        "MINDGENIUS_ENV_LLM_PROVIDER": "minimax",
-        "MINDGENIUS_ENV_MINIMAX_API_KEY": "sk-...",
-        "MINDGENIUS_ENV_MINIMAX_MODEL": "MiniMax-M3",
-        "MINDMAP_DATA_DIR": "data",
-        "MINDMAP_DOCUMENT_ROOTS": "documents"
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_BASE_URL": "http://127.0.0.1:8787",
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_LLM_PROVIDER": "minimax",
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_API_KEY": "sk-...",
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_MODEL": "MiniMax-M3",
+        "EASTER_MIND_MAP_MCP_MINDMAP_DOCUMENT_ROOTS": "documents"
       }
     }
   }
@@ -65,8 +64,8 @@ before restarting the MCP host.
 Provider variables must be present in the environment of the MCP server process
 that runs `bun dist/index.js`. Shell startup files such as `~/.zshrc` are not a
 reliable source for MCP hosts unless the host process was launched from that
-same shell session. For reliable setup, put `MINDGENIUS_ENV_LLM_PROVIDER`,
-`MINDGENIUS_ENV_MINIMAX_API_KEY`, and related values in the MCP host `env`
+same shell session. For reliable setup, put `EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_LLM_PROVIDER`,
+`EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_API_KEY`, and related values in the MCP host `env`
 block, or start the MCP host from an environment where those variables are
 already exported.
 
@@ -74,7 +73,7 @@ If the upstream is not already running, the adapter starts
 `original-MindGeniusAI` with `pnpm --dir original-MindGeniusAI dev:server` by
 default. If `original-MindGeniusAI/node_modules` is missing, it first runs
 `pnpm --dir original-MindGeniusAI install --frozen-lockfile`. Override
-`MINDGENIUS_START_COMMAND` or `MINDGENIUS_INSTALL_COMMAND` only when you want a
+`EASTER_MIND_MAP_MCP_MINDGENIUS_START_COMMAND` or `EASTER_MIND_MAP_MCP_MINDGENIUS_INSTALL_COMMAND` only when you want a
 different command. The adapter checks `/api/health` before each upstream run and
 waits for the configured health timeout.
 
@@ -90,5 +89,5 @@ pnpm dev:server
 ```
 
 Use those commands only when you want to run the upstream manually. Point
-`MINDGENIUS_BASE_URL` at the server URL that exposes `/api/health`, `/api/agent`,
+`EASTER_MIND_MAP_MCP_MINDGENIUS_BASE_URL` at the server URL that exposes `/api/health`, `/api/agent`,
 `/api/uploadFile`, and `/api/document/init`.

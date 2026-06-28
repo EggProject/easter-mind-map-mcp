@@ -46,7 +46,7 @@ sorosításra épül.
 
 PDF-alapú generáláshoz:
 
-1. Tedd a PDF-et egy `MINDMAP_DOCUMENT_ROOTS` alatt engedélyezett könyvtárba.
+1. Tedd a PDF-et egy `EASTER_MIND_MAP_MCP_MINDMAP_DOCUMENT_ROOTS` alatt engedélyezett könyvtárba.
 2. Hivd a `mindmap_document_add` toolt `{ source: { type: "local_path", path } }`
    inputtal.
 3. Hívd a `mindmap_document_index` toolt a visszakapott `documentId` értékkel.
@@ -57,7 +57,8 @@ Az adapter átadja a dokumentumot az upstreamnek, és stabil caller-facing
 
 ## Kimenetek
 
-A generált artifactok MCP resource linkként jönnek vissza, nem inline bináris
-payloadként. A `mindmap://exports/{planningId}/opml` vagy
-`mindmap://exports/{planningId}/png` erőforrást csak akkor olvasd, ha a hostnak
-szüksége van az artifact tartalmára.
+A generált artifactok verziózott MCP resource linkként jönnek vissza, nem inline
+bináris payloadként. A `mindmap://exports/{planningId}/{version}/opml` vagy
+`mindmap://exports/{planningId}/{version}/png` erőforrást csak akkor olvasd, ha a
+hostnak szüksége van az artifact tartalmára. Az MCP szerver resource-read
+időben hívja meg a MindGeniusAI exportot.

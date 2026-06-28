@@ -1,6 +1,6 @@
 # easter-mind-map-mcp
 
-> Perzisztens MCP adapter MindGeniusAI mind map generáláshoz, finomításhoz, erőforrásokhoz és exportokhoz.
+> Memória alapú MCP adapter MindGeniusAI mind map generáláshoz, finomításhoz, erőforrásokhoz és exportokhoz.
 
 [![Verzió](https://img.shields.io/badge/verzi%C3%B3-0.1.0-blue.svg)](package.json)
 [![Runtime](https://img.shields.io/badge/runtime-Bun%20%3E%3D1.3.0-black.svg)](package.json)
@@ -15,10 +15,11 @@
 ## Mi ez?
 
 Az **`easter-mind-map-mcp`** egy Bun és TypeScript alapú MCP szerver, amely a
-MindGeniusAI upstream alkalmazást perzisztens, hostbarát eszközök mögé teszi.
-Lokálisan tárolja a tervállapotot, sorba rendezi a futásokat, stabil ID-kat
-őriz meg, MCP erőforrásokat ad a tervadatokhoz, és a kész mapeket OPML, PNG
-vagy Markdown formátumba exportálja.
+MindGeniusAI upstream alkalmazást hostbarát eszközök mögé teszi. A tervállapotot
+az aktuális MCP process memóriájában tartja, sorba rendezi a futásokat, a process
+élettartamán belül stabil ID-kat őriz meg, MCP erőforrásokat ad a tervadatokhoz,
+és a kész mapeket lazy resource read során exportálja OPML, PNG vagy Markdown
+formátumba.
 
 A szerver stdio-n keresztül beszél MCP-t. Saját HTTP API-t nem nyit; egy
 környezeti változókkal beállított MindGeniusAI HTTP/SSE upstreamet hív.
@@ -35,14 +36,16 @@ akkor kell, ha saját fejlesztés közben TypeScript forrásfájlokat módosíta
 Ha az upstream még nem healthy, az adapter automatikusan elindítja a bundled
 `original-MindGeniusAI` szervert a `pnpm --dir original-MindGeniusAI dev:server`
 paranccsal.
-A MindGeniusAI provider változókat, például `MINDGENIUS_ENV_LLM_PROVIDER` és
-`MINDGENIUS_ENV_MINIMAX_API_KEY`, az MCP host env-jében add meg.
+A MindGeniusAI provider változókat, például `EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_LLM_PROVIDER` és
+`EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_API_KEY`, az MCP host env-jében add meg.
 A változóknak a `bun dist/index.js` process indulásakor kell látszaniuk. A
 `~/.zshrc` jellegű shell startup fájlok csak akkor elegendők, ha maga az MCP
 host is abból a shell sessionből indult; különben tedd a változókat az MCP host
 `env` blokkjába.
-A logolás alapból ki van kapcsolva `LOGLEVEL=NONE` értékkel; `LOGLEVEL=DEBUG`
-esetén részletes adapter és MindGeniusAI szerverkimenet íródik a `logs/` alá.
+A logolás alapból ki van kapcsolva `EASTER_MIND_MAP_MCP_LOGLEVEL=NONE`
+értékkel; `EASTER_MIND_MAP_MCP_LOGLEVEL=DEBUG` esetén részletes adapter és
+MindGeniusAI szerverkimenet íródik alapértelmezetten ide:
+`/tmp/easter-mind-map-mcp/logs/mcp.log`.
 
 Az MCP host bekötéséhez, az upstream beállításához és a kötelező tool flow-hoz
 használd az alább szétbontott dokumentációt, ne ezt az egy fájlt.

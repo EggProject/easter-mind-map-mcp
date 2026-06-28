@@ -19,8 +19,8 @@ Large plan content and export binaries are addressed as resources:
 - `mindmap://plans/{planningId}/outline`
 - `mindmap://plans/{planningId}/markdown`
 - `mindmap://plans/{planningId}/events`
-- `mindmap://exports/{planningId}/opml`
-- `mindmap://exports/{planningId}/png`
+- `mindmap://exports/{planningId}/{version}/opml`
+- `mindmap://exports/{planningId}/{version}/png`
 - `mindmap://guide`
 
 Required autonomous flow:

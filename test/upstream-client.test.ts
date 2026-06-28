@@ -50,6 +50,40 @@ describe('HTTP upstream client SSE hygiene', () => {
     expect(healthChecks).toBe(2)
   })
 
+  it('does not log transient startup connection errors as health failures', async () => {
+    let started = false
+    let healthChecks = 0
+    globalThis.fetch = (async () => {
+      healthChecks += 1
+      if (!started) throw new Error('Unable to connect. Is the computer able to access the url?')
+      return new Response(null, { status: 200 })
+    }) as unknown as typeof fetch
+    const dataDir = await mkdtemp(join(tmpdir(), 'mindmap-health-log-'))
+    const logPath = join(dataDir, 'logs', 'runtime.log')
+    const logger = createLogger('DEBUG', logPath)
+
+    const client = new HttpUpstreamClient(
+      'http://upstream.test',
+      'start-upstream',
+      1_000,
+      () => {
+        started = true
+      },
+      180_000,
+      undefined,
+      undefined,
+      {},
+      undefined,
+      logger,
+    )
+
+    await client.ensureReady()
+    const output = readFileSync(logPath, 'utf8')
+    expect(healthChecks).toBe(2)
+    expect(output).toContain('MindGeniusAI health check pending')
+    expect(output).not.toContain('Unable to connect')
+  })
+
   it('logs default install command output at DEBUG level', async () => {
     let healthChecks = 0
     globalThis.fetch = (async () => {
@@ -111,7 +145,12 @@ describe('HTTP upstream client SSE hygiene', () => {
 
   it('installs missing upstream dependencies and forwards env before starting', async () => {
     let started = false
-    const calls: Array<{ type: string; command: string; env?: Record<string, string> }> = []
+    const calls: Array<{
+      type: string
+      command: string
+      cwd?: string
+      env?: Record<string, string>
+    }> = []
     globalThis.fetch = (async () =>
       new Response(null, { status: started ? 200 : 503 })) as unknown as typeof fetch
     const dataDir = await mkdtemp(join(tmpdir(), 'mindmap-install-'))
@@ -122,15 +161,17 @@ describe('HTTP upstream client SSE hygiene', () => {
       1_000,
       (command, options) => {
         started = true
-        calls.push({ type: 'start', command, env: options?.env })
+        calls.push({ type: 'start', command, cwd: options?.cwd, env: options?.env })
       },
       180_000,
       'install-upstream',
       join(dataDir, 'node_modules'),
       { OPENAI_API_KEY: 'sk-test' },
       async (command, options) => {
-        calls.push({ type: 'install', command, env: options?.env })
+        calls.push({ type: 'install', command, cwd: options?.cwd, env: options?.env })
       },
+      undefined,
+      '/repo-root',
     )
 
     await client.ensureReady()
@@ -139,6 +180,7 @@ describe('HTTP upstream client SSE hygiene', () => {
       'start:start-upstream',
     ])
     expect(calls.every((call) => call.env?.OPENAI_API_KEY === 'sk-test')).toBe(true)
+    expect(calls.every((call) => call.cwd === '/repo-root')).toBe(true)
   })
 
   it('skips upstream dependency install when the marker path exists', async () => {
@@ -319,6 +361,72 @@ describe('HTTP upstream client SSE hygiene', () => {
       },
     })
     expect(events).toBe(0)
+  })
+
+  it('exports mind maps through the upstream export endpoint', async () => {
+    let requestBody: unknown
+    globalThis.fetch = (async (input: FetchInput, init?: FetchInit) => {
+      expect(String(input)).toBe('http://upstream.test/api/export')
+      requestBody = JSON.parse(String(init?.body))
+      return Response.json({
+        artifacts: [
+          {
+            planningId: 'upstream',
+            version: 1,
+            format: 'markdown',
+            mediaType: 'text/markdown',
+            bytes: 5,
+            dataBase64: Buffer.from('# Map').toString('base64'),
+            createdAt: '2026-06-27T00:00:00.000Z',
+          },
+          {
+            planningId: 'upstream',
+            version: 1,
+            format: 'opml',
+            mediaType: 'text/x-opml',
+            bytes: 6,
+            dataBase64: Buffer.from('<opml/>').toString('base64'),
+            createdAt: '2026-06-27T00:00:00.000Z',
+          },
+        ],
+      })
+    }) as unknown as typeof fetch
+
+    const client = new HttpUpstreamClient('http://upstream.test')
+    const artifacts = await client.exportMindMap({
+      mindMap: { id: 'root', label: 'Root' },
+      markdown: '# Root',
+      formats: ['markdown', 'opml'],
+    })
+
+    expect(requestBody).toEqual({
+      mindMap: { id: 'root', label: 'Root' },
+      markdown: '# Root',
+      formats: ['markdown', 'opml'],
+    })
+    expect(artifacts.map((artifact) => artifact.format)).toEqual(['markdown', 'opml'])
+  })
+
+  it('rejects incomplete upstream export responses', async () => {
+    globalThis.fetch = (async () =>
+      Response.json({
+        artifacts: [
+          {
+            format: 'markdown',
+            mediaType: 'text/markdown',
+            bytes: 5,
+            dataBase64: Buffer.from('# Map').toString('base64'),
+          },
+        ],
+      })) as unknown as typeof fetch
+
+    const client = new HttpUpstreamClient('http://upstream.test')
+    await expect(
+      client.exportMindMap({
+        mindMap: { id: 'root', label: 'Root' },
+        formats: ['markdown', 'png'],
+      }),
+    ).rejects.toThrow('missing png')
   })
 
   it('fails when upstream returns a successful response without an SSE body', async () => {

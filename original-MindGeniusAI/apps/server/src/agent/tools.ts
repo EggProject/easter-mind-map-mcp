@@ -5,7 +5,7 @@ import { logger } from '../lib/logger'
 import type { LLMRequestConfig } from '../llm/provider'
 import { chatModel } from '../llm/provider'
 import { brainstormPrompt, mindMapDirectPrompt, mindMapPrompt, nodeExpandPrompt, structurePrompt } from '../prompts'
-import { retrieveChunks } from '../services/rag'
+import { retrieveAcross } from '../services/rag'
 
 /** 固定三级结构（root → 分支 → 要点），generateObject 据此强校验输出格式 */
 const mindMapStructure = z.object({
@@ -27,10 +27,18 @@ function structureToMarkdown(s: z.infer<typeof mindMapStructure>): string {
   return lines.join('\n')
 }
 
+function stripThinkBlocks(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+}
+
+function isMiniMaxProvider(cfg: LLMRequestConfig): boolean {
+  return cfg.provider === 'minimax'
+}
+
 export interface HermasContext {
   cfg: LLMRequestConfig
-  /** 已上传并完成索引的文档名，rag_query 的检索目标 */
-  fileName?: string
+  /** 已上传并完成索引的文档名集合，rag_query 跨这些文档统一检索 */
+  fileNames?: string[]
 }
 
 export function createHermasTools(ctx: HermasContext) {
@@ -45,6 +53,16 @@ export function createHermasTools(ctx: HermasContext) {
       // 默认单次结构化调用（快）；thorough=true 时才走「发散→结构」两段式（慢、更广）。
       // generateObject 对固定 schema 强校验保证格式；结构化失败回退单次 markdown，兼容弱 provider。
       execute: async ({ topic, extraContext, thorough }) => {
+        if (isMiniMaxProvider(ctx.cfg)) {
+          // Easter MCP custom bugfix: MiniMax-M3 emits <think> reasoning and does not support temperature,
+          // so keep the original structured path for every other provider and use markdown-only output here.
+          const prompt = extraContext
+            ? `${mindMapPrompt(topic)}\n\nIncorporate the following context:\n${extraContext}`
+            : mindMapPrompt(topic)
+          const { text } = await generateText({ model: chatModel(ctx.cfg), prompt })
+          return unwrapFence(stripThinkBlocks(text))
+        }
+
         try {
           const prompt = thorough
             ? structurePrompt(topic, (await generateText({
@@ -79,11 +97,14 @@ export function createHermasTools(ctx: HermasContext) {
         content: z.string().describe('The node content to expand'),
       }),
       execute: async ({ content }) => {
-        const { text } = await generateText({
-          model: chatModel(ctx.cfg),
-          prompt: nodeExpandPrompt(content),
-          temperature: 0.9,
-        })
+        const { text } = isMiniMaxProvider(ctx.cfg)
+          // Easter MCP custom bugfix: MiniMax-M3 logs warnings for unsupported temperature.
+          ? await generateText({ model: chatModel(ctx.cfg), prompt: nodeExpandPrompt(content) })
+          : await generateText({
+              model: chatModel(ctx.cfg),
+              prompt: nodeExpandPrompt(content),
+              temperature: 0.9,
+            })
         return text
       },
     }),
@@ -102,16 +123,16 @@ export function createHermasTools(ctx: HermasContext) {
     }),
 
     rag_query: tool({
-      description: 'Search the user\'s uploaded PDF document for passages relevant to a question. Use before answering anything about the document.',
+      description: 'Search the user\'s uploaded document(s) for passages relevant to a question. Retrieves across all attached documents at once. Use before answering anything about the documents.',
       inputSchema: z.object({
-        question: z.string().describe('What to look up in the document'),
+        question: z.string().describe('What to look up in the document(s)'),
       }),
       execute: async ({ question }) => {
-        if (!ctx.fileName)
+        if (!ctx.fileNames?.length)
           return 'No document has been uploaded/indexed in this session.'
-        const chunks = await retrieveChunks(ctx.fileName, question, ctx.cfg)
+        const chunks = await retrieveAcross(ctx.fileNames, question, ctx.cfg)
         if (chunks.length === 0)
-          return 'The document index is empty or not initialized. Ask the user to initialize the document first.'
+          return 'The document index is empty or not initialized. Ask the user to initialize the document(s) first.'
         return chunks.map((chunk, i) => `[${i + 1}] ${chunk}`).join('\n\n')
       },
     }),

@@ -2,10 +2,17 @@ import { existsSync } from 'node:fs'
 import { basename } from 'node:path'
 import { redactForLog } from '../logger'
 import type { Logger } from '../logger'
-import type { AgentRequest, RunAgentOptions, UpstreamClient } from '../types'
+import type {
+  AgentRequest,
+  ExportArtifact,
+  MindMapOutline,
+  RunAgentOptions,
+  UpstreamClient,
+} from '../types'
 import { decodeAgentEvent, parseSseStream } from './sse'
 
 interface UpstreamProcessOptions {
+  cwd?: string
   env?: Record<string, string>
   logger?: Logger
 }
@@ -13,6 +20,7 @@ interface UpstreamProcessOptions {
 export class HttpUpstreamClient implements UpstreamClient {
   private supervisorStarted = false
   private installPromise?: Promise<void>
+  private lastHealthError?: string
 
   constructor(
     private readonly baseUrl: string,
@@ -31,6 +39,7 @@ export class HttpUpstreamClient implements UpstreamClient {
       options?: UpstreamProcessOptions,
     ) => Promise<void> = defaultRunCommand,
     private readonly logger?: Logger,
+    private readonly workingDirectory?: string,
   ) {}
 
   async ensureReady(signal?: AbortSignal): Promise<void> {
@@ -46,7 +55,11 @@ export class HttpUpstreamClient implements UpstreamClient {
       this.logger?.debug('MindGeniusAI upstream start environment', {
         env: redactForLog(this.upstreamEnv),
       })
-      this.startUpstream(this.startCommand, { env: this.upstreamEnv, logger: this.logger })
+      this.startUpstream(this.startCommand, {
+        cwd: this.workingDirectory,
+        env: this.upstreamEnv,
+        logger: this.logger,
+      })
     }
     const started = Date.now()
     while (Date.now() - started < this.healthTimeoutMs) {
@@ -59,6 +72,7 @@ export class HttpUpstreamClient implements UpstreamClient {
     this.logger?.error('MindGeniusAI upstream health timeout', {
       baseUrl: this.baseUrl,
       healthTimeoutMs: this.healthTimeoutMs,
+      lastHealthError: this.lastHealthError,
     })
     throw new Error('MindGeniusAI upstream did not become healthy before timeout')
   }
@@ -111,6 +125,39 @@ export class HttpUpstreamClient implements UpstreamClient {
     }
   }
 
+  async exportMindMap(options: {
+    mindMap: MindMapOutline
+    markdown?: string
+    formats: Array<'opml' | 'png' | 'markdown'>
+    signal?: AbortSignal
+  }): Promise<ExportArtifact[]> {
+    this.logger?.info('calling MindGeniusAI export endpoint', { formats: options.formats })
+    const response = await fetch(`${this.baseUrl}/api/export`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        mindMap: options.mindMap,
+        markdown: options.markdown,
+        formats: options.formats,
+      }),
+      signal: options.signal,
+    })
+    if (!response.ok) {
+      this.logger?.error('MindGeniusAI export endpoint failed', { status: response.status })
+      throw new Error(`upstream /api/export failed with ${response.status}`)
+    }
+    const body = (await response.json()) as { artifacts?: ExportArtifact[] }
+    if (!Array.isArray(body.artifacts)) {
+      this.logger?.error('MindGeniusAI export response did not contain artifacts')
+      throw new Error('upstream export response did not contain artifacts')
+    }
+    for (const format of options.formats) {
+      const artifact = body.artifacts.find((item) => item.format === format)
+      if (!artifact?.dataBase64) throw new Error(`upstream export response missing ${format}`)
+    }
+    return body.artifacts
+  }
+
   async uploadDocument(path: string, displayName?: string, signal?: AbortSignal): Promise<string> {
     this.logger?.info('uploading document to MindGeniusAI', { displayName, path })
     const file = Bun.file(path)
@@ -154,9 +201,11 @@ export class HttpUpstreamClient implements UpstreamClient {
     try {
       const response = await fetch(`${this.baseUrl}/api/health`, { signal })
       this.logger?.debug('MindGeniusAI health response', { status: response.status })
+      if (response.ok) this.lastHealthError = undefined
       return response.ok
     } catch (error) {
-      this.logger?.debug('MindGeniusAI health check failed', { error: String(error) })
+      this.lastHealthError = String(error)
+      this.logger?.debug('MindGeniusAI health check pending')
       return false
     }
   }
@@ -174,6 +223,7 @@ export class HttpUpstreamClient implements UpstreamClient {
     }
     this.logger?.info('installing MindGeniusAI dependencies', { command: this.installCommand })
     this.installPromise ??= this.runInstallCommand(this.installCommand, {
+      cwd: this.workingDirectory,
       env: this.upstreamEnv,
       logger: this.logger,
     })
@@ -186,6 +236,7 @@ function defaultStartUpstream(command: string, options?: UpstreamProcessOptions)
   const logger = options?.logger
   const debugOutput = logger?.level === 'DEBUG'
   const process = Bun.spawn(command.split(/\s+/), {
+    cwd: options?.cwd,
     stdout: debugOutput ? 'pipe' : 'ignore',
     stderr: debugOutput ? 'pipe' : 'ignore',
     env: options?.env,
@@ -201,6 +252,7 @@ async function defaultRunCommand(command: string, options?: UpstreamProcessOptio
   const logger = options?.logger
   const debugOutput = logger?.level === 'DEBUG'
   const process = Bun.spawn(command.split(/\s+/), {
+    cwd: options?.cwd,
     stdout: debugOutput ? 'pipe' : 'ignore',
     stderr: debugOutput ? 'pipe' : 'ignore',
     env: options?.env,

@@ -9,7 +9,7 @@ LLM-facing wording lives in `src/mcp/toolDescriptions.ts`.
 
 | Tool                     | Use                                                                   |
 | ------------------------ | --------------------------------------------------------------------- |
-| `mindmap_create`         | Create a persistent plan and queue the first generation run.          |
+| `mindmap_create`         | Create an in-memory plan and queue the first generation run.          |
 | `mindmap_continue`       | Add a refinement instruction to an existing plan.                     |
 | `mindmap_get_status`     | Poll short progress metadata for a plan.                              |
 | `mindmap_get_result`     | Read the current or final map as `outline`, `markdown`, or `summary`. |
@@ -22,15 +22,15 @@ LLM-facing wording lives in `src/mcp/toolDescriptions.ts`.
 
 ## Main resources
 
-| URI                                     | Content                     |
-| --------------------------------------- | --------------------------- |
-| `mindmap://guide`                       | Tool-use guide as Markdown. |
-| `mindmap://plans/{planningId}`          | Stored plan JSON.           |
-| `mindmap://plans/{planningId}/outline`  | Current outline JSON.       |
-| `mindmap://plans/{planningId}/markdown` | Current map Markdown.       |
-| `mindmap://plans/{planningId}/events`   | Event log as NDJSON.        |
-| `mindmap://exports/{planningId}/opml`   | OPML export.                |
-| `mindmap://exports/{planningId}/png`    | PNG export.                 |
+| URI                                             | Content                       |
+| ----------------------------------------------- | ----------------------------- |
+| `mindmap://guide`                               | Tool-use guide as Markdown.   |
+| `mindmap://plans/{planningId}`                  | Stored plan JSON.             |
+| `mindmap://plans/{planningId}/outline`          | Current outline JSON.         |
+| `mindmap://plans/{planningId}/markdown`         | Current map Markdown.         |
+| `mindmap://plans/{planningId}/events`           | Event log as NDJSON.          |
+| `mindmap://exports/{planningId}/{version}/opml` | OPML export generated lazily. |
+| `mindmap://exports/{planningId}/{version}/png`  | PNG export generated lazily.  |
 
 ## Final-step rule
 
@@ -41,4 +41,4 @@ mindmap_export({ planningId, formats: ["opml", "png"] })
 ```
 
 Use `mindmap_get_result` to inspect map content; use `mindmap_export` to produce
-deliverable artifacts.
+versioned resource links. Reading those links calls MindGeniusAI export lazily.

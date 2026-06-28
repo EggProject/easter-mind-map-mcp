@@ -15,8 +15,8 @@ describe('MCP stdio host integration', () => {
       cwd: process.cwd(),
       env: {
         ...process.env,
-        MINDMAP_DATA_DIR: dataDir,
-        MINDMAP_DOCUMENT_ROOTS: dataDir,
+        EASTER_MIND_MAP_MCP_MINDMAP_DATA_DIR: dataDir,
+        EASTER_MIND_MAP_MCP_MINDMAP_DOCUMENT_ROOTS: dataDir,
       },
       stderr: 'pipe',
     })

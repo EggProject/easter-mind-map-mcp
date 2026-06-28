@@ -43,7 +43,7 @@ continuations for the same `planningId`; the service serializes work per plan.
 
 For PDF-backed generation:
 
-1. Place the PDF under a configured `MINDMAP_DOCUMENT_ROOTS` directory.
+1. Place the PDF under a configured `EASTER_MIND_MAP_MCP_MINDMAP_DOCUMENT_ROOTS` directory.
 2. Call `mindmap_document_add` with `{ source: { type: "local_path", path } }`.
 3. Call `mindmap_document_index` with the returned `documentId`.
 4. Call `mindmap_create` with that `documentId`.
@@ -53,7 +53,8 @@ The adapter passes the document to the upstream and keeps the caller-facing
 
 ## Outputs
 
-Generated artifacts are returned as MCP resource links instead of inline binary
-payloads. Read `mindmap://exports/{planningId}/opml` or
-`mindmap://exports/{planningId}/png` only when the host needs the artifact
-content.
+Generated artifacts are returned as versioned MCP resource links instead of
+inline binary payloads. Read
+`mindmap://exports/{planningId}/{version}/opml` or
+`mindmap://exports/{planningId}/{version}/png` only when the host needs the
+artifact content. The MCP server calls MindGeniusAI export at resource-read time.

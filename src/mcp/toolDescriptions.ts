@@ -1,8 +1,8 @@
 export const toolDescriptions = {
   mindmap_create:
-    'Create a new persistent MindGeniusAI mind-map plan and queue the first generation run. Use this first for a new requested map. Do not wait inside the tool for generation to finish. Next action: call mindmap_get_status with the returned planningId.',
+    'Create a new in-memory MindGeniusAI mind-map plan and queue the first generation run. Use this first for a new requested map. Do not wait inside the tool for generation to finish. Next action: call mindmap_get_status with the returned planningId.',
   mindmap_continue:
-    'Continue an existing persistent plan with a new instruction, using the previous messages and current mindMap state. Use only after mindmap_create has returned a planningId. Do not start concurrent continuations for the same planningId. Next action: call mindmap_get_status.',
+    'Continue an existing in-memory plan with a new instruction, using the previous messages and current mindMap state. Use only after mindmap_create has returned a planningId. Do not start concurrent continuations for the same planningId. Next action: call mindmap_get_status.',
   mindmap_get_status:
     'Return short progress metadata for a plan. Use this for polling. Do not use it to fetch the full map or event log. Next action: poll again, call mindmap_get_result if completed, or report the failure.',
   mindmap_get_result:
@@ -16,7 +16,7 @@ export const toolDescriptions = {
   mindmap_document_index:
     'Initialize the uploaded PDF document in the upstream RAG index. Use after mindmap_document_add and before mindmap_create with documentId. Do not start duplicate indexing for the same documentId. Next action: call mindmap_create with documentId.',
   mindmap_export:
-    'Export a committed plan version. Use as the required final step after a map is complete. Do not return OPML or PNG inline; return resource links for large artifacts. Next action: read the returned resources only when needed.',
+    'Create versioned export resource links for a committed plan version. Use as the required final step after a map is complete. Do not return OPML or PNG inline; the resource read calls MindGeniusAI export lazily. Next action: read the returned resources only when needed.',
   mindmap_guide:
     'Return the deterministic AI-readable recipe for using this MCP server correctly. Use when tool order is uncertain. Do not replace the actual tool calls with a prose answer. Next action: follow the recipe through mindmap_export.',
 } as const

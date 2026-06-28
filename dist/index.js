@@ -25274,7 +25274,8 @@ class StdioServerTransport {
 }
 
 // src/config.ts
-import { basename, resolve } from "path";
+import { dirname as dirname2, isAbsolute, resolve } from "path";
+import { fileURLToPath } from "url";
 
 // src/logger.ts
 import { appendFileSync, mkdirSync } from "fs";
@@ -25336,41 +25337,59 @@ class FileLogger {
 // src/config.ts
 var DEFAULT_UPSTREAM_START_COMMAND = "pnpm --dir original-MindGeniusAI dev:server";
 var DEFAULT_UPSTREAM_INSTALL_COMMAND = "pnpm --dir original-MindGeniusAI install --frozen-lockfile";
-var UPSTREAM_ENV_PREFIX = "MINDGENIUS_ENV_";
+var ENV_PREFIX = "EASTER_MIND_MAP_MCP_";
+var UPSTREAM_ENV_PREFIX = `${ENV_PREFIX}MINDGENIUS_ENV_`;
+var DEFAULT_BASE_DIR = "/tmp/easter-mind-map-mcp";
+var PROJECT_ROOT = resolve(dirname2(fileURLToPath(import.meta.url)), "..");
+var SYSTEM_ENV_KEYS = [
+  "HOME",
+  "LANG",
+  "LOGNAME",
+  "PATH",
+  "SHELL",
+  "TERM",
+  "TMPDIR",
+  "USER",
+  "__CF_USER_TEXT_ENCODING"
+];
 function loadConfig(env = process.env) {
-  const cwd = process.cwd();
-  const upstreamPort = env.MINDGENIUS_ENV_PORT ?? env.PORT;
-  const upstreamBaseUrl = env.MINDGENIUS_BASE_URL ?? `http://127.0.0.1:${upstreamPort ?? 8787}`;
+  const projectRoot = PROJECT_ROOT;
+  const upstreamPort = envValue(env, "MINDGENIUS_ENV_PORT");
+  const upstreamBaseUrl = envValue(env, "MINDGENIUS_BASE_URL") ?? `http://127.0.0.1:${upstreamPort ?? 8787}`;
   return {
+    projectRoot,
     upstreamBaseUrl,
-    upstreamStartCommand: env.MINDGENIUS_START_COMMAND ?? DEFAULT_UPSTREAM_START_COMMAND,
-    upstreamInstallCommand: env.MINDGENIUS_INSTALL_COMMAND ?? DEFAULT_UPSTREAM_INSTALL_COMMAND,
-    upstreamInstallCheckPath: resolve(cwd, "original-MindGeniusAI/node_modules"),
+    upstreamStartCommand: envValue(env, "MINDGENIUS_START_COMMAND") ?? DEFAULT_UPSTREAM_START_COMMAND,
+    upstreamInstallCommand: envValue(env, "MINDGENIUS_INSTALL_COMMAND") ?? DEFAULT_UPSTREAM_INSTALL_COMMAND,
+    upstreamInstallCheckPath: resolve(projectRoot, "original-MindGeniusAI/node_modules"),
+    upstreamWorkingDirectory: projectRoot,
     upstreamEnv: upstreamEnvFrom(env, upstreamBaseUrl),
-    upstreamHealthTimeoutMs: numberFromEnv(env.MINDGENIUS_HEALTH_TIMEOUT_MS, 30000),
-    logLevel: normalizeLogLevel(env.LOGLEVEL ?? env.LOG_LEVEL ?? env.loglevel),
-    logPath: logPathFromEnv(env.LOGPATH ?? env.LOG_PATH ?? env.logpath, cwd),
-    dataDir: resolve(cwd, env.MINDMAP_DATA_DIR ?? "data"),
-    allowedDocumentRoots: (env.MINDMAP_DOCUMENT_ROOTS ?? resolve(cwd, "documents")).split(",").map((root) => resolve(root.trim())).filter(Boolean),
+    upstreamHealthTimeoutMs: numberFromEnv(envValue(env, "MINDGENIUS_HEALTH_TIMEOUT_MS"), 30000),
+    logLevel: normalizeLogLevel(envValue(env, "LOGLEVEL")),
+    logPath: pathFromEnv(envValue(env, "LOGPATH"), `${DEFAULT_BASE_DIR}/logs/mcp.log`, projectRoot),
+    dataDir: pathFromEnv(envValue(env, "MINDMAP_DATA_DIR"), `${DEFAULT_BASE_DIR}/data`, projectRoot),
+    allowedDocumentRoots: (envValue(env, "MINDMAP_DOCUMENT_ROOTS") ?? `${DEFAULT_BASE_DIR}/documents`).split(",").map((root) => root.trim()).filter(Boolean).map((root) => pathFromEnv(root, root, projectRoot)),
     concurrency: {
-      maxConcurrentRunsGlobal: numberFromEnv(env.MINDMAP_MAX_RUNS_GLOBAL, 4),
-      maxConcurrentRunsPerOwner: numberFromEnv(env.MINDMAP_MAX_RUNS_PER_OWNER, 2),
+      maxConcurrentRunsGlobal: numberFromEnv(envValue(env, "MINDMAP_MAX_RUNS_GLOBAL"), 4),
+      maxConcurrentRunsPerOwner: numberFromEnv(envValue(env, "MINDMAP_MAX_RUNS_PER_OWNER"), 2),
       maxConcurrentRunsPerPlanning: 1,
-      maxConcurrentDocumentIndexes: numberFromEnv(env.MINDMAP_MAX_DOCUMENT_INDEXES, 2),
-      upstreamRequestTimeoutMs: numberFromEnv(env.MINDMAP_UPSTREAM_TIMEOUT_MS, 180000),
-      maxRetries: numberFromEnv(env.MINDMAP_MAX_RETRIES, 1)
+      maxConcurrentDocumentIndexes: numberFromEnv(envValue(env, "MINDMAP_MAX_DOCUMENT_INDEXES"), 2),
+      upstreamRequestTimeoutMs: numberFromEnv(envValue(env, "MINDMAP_UPSTREAM_TIMEOUT_MS"), 180000),
+      maxRetries: numberFromEnv(envValue(env, "MINDMAP_MAX_RETRIES"), 1)
     }
   };
 }
-function logPathFromEnv(value, cwd) {
-  const logsDir = resolve(cwd, "logs");
-  if (!value?.trim())
-    return resolve(logsDir, "easter-mind-map-mcp.log");
-  return resolve(logsDir, basename(value.trim()));
+function envValue(env, name) {
+  return env[`${ENV_PREFIX}${name}`];
+}
+function pathFromEnv(value, fallback, projectRoot) {
+  const raw = value?.trim() || fallback;
+  return isAbsolute(raw) ? resolve(raw) : resolve(projectRoot, raw);
 }
 function upstreamEnvFrom(env, upstreamBaseUrl) {
   const upstreamEnv = {};
-  for (const [key, value] of Object.entries(env)) {
+  for (const key of SYSTEM_ENV_KEYS) {
+    const value = env[key];
     if (value !== undefined)
       upstreamEnv[key] = value;
   }
@@ -25400,104 +25419,65 @@ function numberFromEnv(value, fallback) {
 }
 
 // src/store.ts
-import { mkdir, readFile, writeFile } from "fs/promises";
-import { dirname as dirname2, join } from "path";
-
-class FileStore {
-  filePath;
+class MemoryStore {
   state;
-  writes = Promise.resolve();
-  constructor(dataDir) {
-    this.filePath = join(dataDir, "state.json");
+  constructor() {
+    this.state = {
+      plans: {},
+      runs: {},
+      events: {},
+      documents: {},
+      idempotency: {}
+    };
   }
   async getPlan(id) {
-    return (await this.load()).plans[id];
+    return this.state.plans[id];
   }
   async listAllPlans() {
-    return Object.values((await this.load()).plans);
+    return Object.values(this.state.plans);
   }
   async listPlans(ownerId) {
-    return Object.values((await this.load()).plans).filter((plan) => plan.ownerId === ownerId);
+    return Object.values(this.state.plans).filter((plan) => plan.ownerId === ownerId);
   }
   async savePlan(plan) {
-    const state = await this.load();
-    state.plans[plan.id] = plan;
-    await this.persist();
+    this.state.plans[plan.id] = plan;
   }
   async getRun(id) {
-    return (await this.load()).runs[id];
+    return this.state.runs[id];
   }
   async listRuns(planningId) {
-    return Object.values((await this.load()).runs).filter((run) => run.planningId === planningId);
+    return Object.values(this.state.runs).filter((run) => run.planningId === planningId);
   }
   async saveRun(run) {
-    const state = await this.load();
-    state.runs[run.id] = run;
-    await this.persist();
+    this.state.runs[run.id] = run;
   }
   async appendEvent(event) {
-    const state = await this.load();
-    state.events[event.planningId] = [...state.events[event.planningId] ?? [], event];
-    await this.persist();
+    this.state.events[event.planningId] = [...this.state.events[event.planningId] ?? [], event];
   }
   async listEvents(planningId) {
-    return [...(await this.load()).events[planningId] ?? []];
+    return [...this.state.events[planningId] ?? []];
   }
   async getDocument(id) {
-    return (await this.load()).documents[id];
+    return this.state.documents[id];
   }
   async saveDocument(document) {
-    const state = await this.load();
-    state.documents[document.id] = document;
-    await this.persist();
-  }
-  async saveExport(key, artifact) {
-    const state = await this.load();
-    state.exports[key] = artifact;
-    await this.persist();
-  }
-  async getExport(key) {
-    return (await this.load()).exports[key];
+    this.state.documents[document.id] = document;
   }
   async getIdempotency(ownerId, key) {
-    return (await this.load()).idempotency[`${ownerId}:${key}`];
+    return this.state.idempotency[`${ownerId}:${key}`];
   }
   async saveIdempotency(ownerId, key, value) {
-    const state = await this.load();
-    state.idempotency[`${ownerId}:${key}`] = value;
-    await this.persist();
-  }
-  async load() {
-    if (this.state)
-      return this.state;
-    try {
-      this.state = JSON.parse(await readFile(this.filePath, "utf8"));
-    } catch {
-      this.state = {
-        plans: {},
-        runs: {},
-        events: {},
-        documents: {},
-        exports: {},
-        idempotency: {}
-      };
-    }
-    return this.state;
-  }
-  async persist() {
-    const state = this.state;
-    if (!state)
-      return;
-    this.writes = this.writes.then(async () => {
-      await mkdir(dirname2(this.filePath), { recursive: true });
-      await writeFile(this.filePath, JSON.stringify(state, null, 2));
-    });
-    await this.writes;
+    this.state.idempotency[`${ownerId}:${key}`] = value;
   }
 }
 
-// src/export.ts
-import { deflateSync } from "zlib";
+// src/ids.ts
+function newId(prefix) {
+  return `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
+}
+function nowIso() {
+  return new Date().toISOString();
+}
 
 // src/mindmap.ts
 var LIMITS = {
@@ -25605,21 +25585,6 @@ function applyOps(root, ops) {
   }
   return applied;
 }
-function outlineToMarkdown(outline) {
-  const lines = [];
-  const walk = (node, depth) => {
-    if (depth <= 2) {
-      lines.push(`${"#".repeat(depth)} ${node.label}`);
-    } else {
-      lines.push(`${"  ".repeat(depth - 3)}- ${node.label}`);
-    }
-    for (const child of node.children ?? [])
-      walk(child, depth + 1);
-  };
-  walk(outline, 1);
-  return lines.join(`
-`);
-}
 function cloneOutline(outline) {
   return {
     id: outline.id,
@@ -25681,140 +25646,6 @@ function clampLabel(label) {
 }
 function newNodeId() {
   return `node_${crypto.randomUUID().replaceAll("-", "")}`;
-}
-
-// src/export.ts
-function exportOpml(outline) {
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<opml version="2.0">',
-    "<head><title>Mind map</title></head>",
-    "<body>",
-    outlineToOpml(outline, 1),
-    "</body>",
-    "</opml>"
-  ].join(`
-`);
-}
-function exportMarkdown(outline) {
-  return outlineToMarkdown(outline);
-}
-function exportPng(outline) {
-  const nodes = flatten(outline);
-  const width = 960;
-  const height = Math.max(360, 120 + nodes.length * 46);
-  const rgba = new Uint8Array(width * height * 4);
-  fill(rgba, width, height, 248, 250, 252, 255);
-  for (let i = 0;i < nodes.length; i += 1) {
-    const node = nodes[i];
-    const x = 48 + node.depth * 150;
-    const y = 48 + i * 46;
-    rect(rgba, width, height, x, y, Math.max(120, Math.min(360, node.label.length * 9)), 28, [
-      node.depth === 0 ? 22 : 59,
-      node.depth === 0 ? 101 : 130,
-      node.depth === 0 ? 52 : 246,
-      255
-    ]);
-  }
-  return encodePng(width, height, rgba);
-}
-function outlineToOpml(node, depth) {
-  const indent = "  ".repeat(depth);
-  const attrs = `text="${escapeXml(node.label)}" _id="${escapeXml(node.id)}"`;
-  if (!node.children?.length)
-    return `${indent}<outline ${attrs}/>`;
-  return [
-    `${indent}<outline ${attrs}>`,
-    ...node.children.map((child) => outlineToOpml(child, depth + 1)),
-    `${indent}</outline>`
-  ].join(`
-`);
-}
-function flatten(root) {
-  const out = [];
-  const walk = (node, depth) => {
-    out.push({ label: node.label, depth });
-    for (const child of node.children ?? [])
-      walk(child, depth + 1);
-  };
-  walk(root, 0);
-  return out;
-}
-function fill(rgba, width, height, r, g, b, a) {
-  for (let y = 0;y < height; y += 1) {
-    for (let x = 0;x < width; x += 1) {
-      const offset = (y * width + x) * 4;
-      rgba[offset] = r;
-      rgba[offset + 1] = g;
-      rgba[offset + 2] = b;
-      rgba[offset + 3] = a;
-    }
-  }
-}
-function rect(rgba, width, height, x, y, w, h, color) {
-  for (let yy = Math.max(0, y);yy < Math.min(height, y + h); yy += 1) {
-    for (let xx = Math.max(0, x);xx < Math.min(width, x + w); xx += 1) {
-      const offset = (yy * width + xx) * 4;
-      rgba[offset] = color[0];
-      rgba[offset + 1] = color[1];
-      rgba[offset + 2] = color[2];
-      rgba[offset + 3] = color[3];
-    }
-  }
-}
-function encodePng(width, height, rgba) {
-  const raw = new Uint8Array((width * 4 + 1) * height);
-  for (let y = 0;y < height; y += 1) {
-    const rowStart = y * (width * 4 + 1);
-    raw[rowStart] = 0;
-    raw.set(rgba.subarray(y * width * 4, (y + 1) * width * 4), rowStart + 1);
-  }
-  const chunks = [
-    chunk("IHDR", u32(width, height, 8, 6, 0, 0, 0)),
-    chunk("IDAT", deflateSync(raw)),
-    chunk("IEND", new Uint8Array)
-  ];
-  return concat(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), ...chunks);
-}
-function chunk(type, data) {
-  const typeBytes = new TextEncoder().encode(type);
-  const body = concat(typeBytes, data);
-  return concat(u32(data.length), body, u32(crc32(body)));
-}
-function u32(...values) {
-  const bytes = new Uint8Array(values.length * 4);
-  const view = new DataView(bytes.buffer);
-  values.forEach((value, index) => view.setUint32(index * 4, value >>> 0));
-  return bytes;
-}
-function concat(...arrays) {
-  const out = new Uint8Array(arrays.reduce((sum, item) => sum + item.length, 0));
-  let offset = 0;
-  for (const array3 of arrays) {
-    out.set(array3, offset);
-    offset += array3.length;
-  }
-  return out;
-}
-function crc32(bytes) {
-  let crc = 4294967295;
-  for (const byte of bytes) {
-    crc ^= byte;
-    for (let i = 0;i < 8; i += 1)
-      crc = crc >>> 1 ^ 3988292384 & -(crc & 1);
-  }
-  return (crc ^ 4294967295) >>> 0;
-}
-function escapeXml(value) {
-  return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
-
-// src/ids.ts
-function newId(prefix) {
-  return `${prefix}_${crypto.randomUUID().replaceAll("-", "")}`;
-}
-function nowIso() {
-  return new Date().toISOString();
 }
 
 // src/queue.ts
@@ -25935,6 +25766,7 @@ class MindMapService {
   config;
   queue;
   documentLocks = new Set;
+  exportSnapshots = new Map;
   constructor(store, upstream, config2) {
     this.store = store;
     this.upstream = upstream;
@@ -26089,35 +25921,7 @@ class MindMapService {
     }));
   }
   async recoverPendingRuns() {
-    let recovered = 0;
-    const plans = await this.store.listAllPlans();
-    for (const plan of plans) {
-      const runs = await this.store.listRuns(plan.id);
-      const pendingRuns = runs.filter((run) => ["queued", "running"].includes(run.status));
-      if (pendingRuns.length === 0)
-        continue;
-      if (plan.status === "running") {
-        await this.store.savePlan({ ...plan, status: "queued", updatedAt: nowIso() });
-      }
-      for (const run of pendingRuns) {
-        const queuedRun = {
-          ...run,
-          status: "queued",
-          startedAt: undefined,
-          completedAt: undefined,
-          error: undefined
-        };
-        await this.store.saveRun(queuedRun);
-        this.queue.enqueue({
-          ownerId: queuedRun.ownerId,
-          planningId: queuedRun.planningId,
-          runId: queuedRun.id,
-          execute: (signal) => this.executeRun(queuedRun.id, signal)
-        });
-        recovered += 1;
-      }
-    }
-    return recovered;
+    return 0;
   }
   async documentAdd(input) {
     const path = assertAllowedLocalPdf(input.source.path, this.config.allowedDocumentRoots);
@@ -26164,15 +25968,17 @@ class MindMapService {
     const plan = assertPlanOwner(await this.store.getPlan(planningId), ownerId);
     if (!plan.mindMap)
       throw new Error("plan has no mind map to export");
+    this.exportSnapshots.set(exportSnapshotKey(planningId, plan.version), {
+      planningId,
+      version: plan.version,
+      mindMap: cloneOutline(plan.mindMap),
+      markdown: plan.markdown
+    });
     const artifacts = [];
     for (const format of formats) {
-      const artifact = makeArtifact(plan, format);
-      const key = `${planningId}/${format}`;
-      await this.store.saveExport(key, artifact);
       artifacts.push({
         format,
-        resourceUri: `mindmap://exports/${planningId}/${format}`,
-        bytes: artifact.bytes
+        resourceUri: `mindmap://exports/${planningId}/${plan.version}/${format}`
       });
     }
     return { planningId, version: plan.version, artifacts };
@@ -26188,9 +25994,17 @@ class MindMapService {
       return { uri, mimeType: "text/markdown", text: GUIDE };
     if (parsed.kind === "export") {
       assertPlanOwner(await this.store.getPlan(parsed.planningId), ownerId);
-      const artifact = await this.store.getExport(`${parsed.planningId}/${parsed.format}`);
-      if (!artifact)
-        throw new Error("export artifact not found; call mindmap_export first");
+      const snapshot = this.exportSnapshots.get(exportSnapshotKey(parsed.planningId, parsed.version));
+      if (!snapshot)
+        throw new Error("export snapshot not found; call mindmap_export first");
+      await this.upstream.ensureReady();
+      const [artifact] = await this.upstream.exportMindMap({
+        mindMap: snapshot.mindMap,
+        markdown: snapshot.markdown,
+        formats: [parsed.format]
+      });
+      if (!artifact?.dataBase64)
+        throw new Error(`upstream export response missing ${parsed.format}`);
       return { uri, mimeType: artifact.mediaType, blob: artifact.dataBase64 };
     }
     const plan = assertPlanOwner(await this.store.getPlan(parsed.planningId), ownerId);
@@ -26309,33 +26123,6 @@ class MindMapService {
     }
   }
 }
-function makeArtifact(plan, format) {
-  if (!plan.mindMap)
-    throw new Error("missing mind map");
-  const createdAt = nowIso();
-  if (format === "png") {
-    const data = exportPng(plan.mindMap);
-    return {
-      planningId: plan.id,
-      version: plan.version,
-      format,
-      mediaType: "image/png",
-      bytes: data.byteLength,
-      dataBase64: Buffer.from(data).toString("base64"),
-      createdAt
-    };
-  }
-  const text = format === "opml" ? exportOpml(plan.mindMap) : exportMarkdown(plan.mindMap);
-  return {
-    planningId: plan.id,
-    version: plan.version,
-    format,
-    mediaType: format === "opml" ? "text/x-opml" : "text/markdown",
-    bytes: new TextEncoder().encode(text).byteLength,
-    dataBase64: Buffer.from(text).toString("base64"),
-    createdAt
-  };
-}
 function summarize(plan) {
   const nodeCount = countNodes(plan.mindMap);
   return `${plan.status} plan version ${plan.version}; ${nodeCount} mind-map node(s).`;
@@ -26364,18 +26151,22 @@ function parseMindmapUri(uri) {
       planningId: planMatch[1]
     };
   }
-  const exportMatch = /^mindmap:\/\/exports\/([^/]+)\/(opml|png|markdown)$/u.exec(uri);
+  const exportMatch = /^mindmap:\/\/exports\/([^/]+)\/(\d+)\/(opml|png|markdown)$/u.exec(uri);
   if (exportMatch) {
     return {
       kind: "export",
       planningId: exportMatch[1],
-      format: exportMatch[2]
+      version: Number(exportMatch[2]),
+      format: exportMatch[3]
     };
   }
   return null;
 }
+function exportSnapshotKey(planningId, version2) {
+  return `${planningId}/${version2}`;
+}
 var GUIDE = [
-  "1) Call mindmap_create(prompt[, documentId]) to start a new persistent plan, then preserve the returned planningId exactly.",
+  "1) Call mindmap_create(prompt[, documentId]) to start a new in-memory plan, then preserve the returned planningId exactly.",
   "2) Repeat mindmap_get_status(planningId) until status is completed or failed.",
   "3) To refine an existing map, call mindmap_continue(planningId, instruction), then return to step 2.",
   "4) Call mindmap_get_result(planningId, format:'outline'|'markdown') only when the current or final map is needed.",
@@ -26386,7 +26177,7 @@ var GUIDE = [
 
 // src/upstream/client.ts
 import { existsSync } from "fs";
-import { basename as basename2 } from "path";
+import { basename } from "path";
 
 // src/upstream/sse.ts
 var AGENT_EVENT_PREFIX = "agent:";
@@ -26453,9 +26244,11 @@ class HttpUpstreamClient {
   upstreamEnv;
   runInstallCommand;
   logger;
+  workingDirectory;
   supervisorStarted = false;
   installPromise;
-  constructor(baseUrl, startCommand, healthTimeoutMs = 30000, startUpstream = defaultStartUpstream, requestTimeoutMs = 180000, installCommand, installCheckPath, upstreamEnv = process.env, runInstallCommand = defaultRunCommand, logger) {
+  lastHealthError;
+  constructor(baseUrl, startCommand, healthTimeoutMs = 30000, startUpstream = defaultStartUpstream, requestTimeoutMs = 180000, installCommand, installCheckPath, upstreamEnv = process.env, runInstallCommand = defaultRunCommand, logger, workingDirectory) {
     this.baseUrl = baseUrl;
     this.startCommand = startCommand;
     this.healthTimeoutMs = healthTimeoutMs;
@@ -26466,6 +26259,7 @@ class HttpUpstreamClient {
     this.upstreamEnv = upstreamEnv;
     this.runInstallCommand = runInstallCommand;
     this.logger = logger;
+    this.workingDirectory = workingDirectory;
   }
   async ensureReady(signal) {
     this.logger?.debug("checking MindGeniusAI upstream health", { baseUrl: this.baseUrl });
@@ -26480,7 +26274,11 @@ class HttpUpstreamClient {
       this.logger?.debug("MindGeniusAI upstream start environment", {
         env: redactForLog(this.upstreamEnv)
       });
-      this.startUpstream(this.startCommand, { env: this.upstreamEnv, logger: this.logger });
+      this.startUpstream(this.startCommand, {
+        cwd: this.workingDirectory,
+        env: this.upstreamEnv,
+        logger: this.logger
+      });
     }
     const started = Date.now();
     while (Date.now() - started < this.healthTimeoutMs) {
@@ -26492,7 +26290,8 @@ class HttpUpstreamClient {
     }
     this.logger?.error("MindGeniusAI upstream health timeout", {
       baseUrl: this.baseUrl,
-      healthTimeoutMs: this.healthTimeoutMs
+      healthTimeoutMs: this.healthTimeoutMs,
+      lastHealthError: this.lastHealthError
     });
     throw new Error("MindGeniusAI upstream did not become healthy before timeout");
   }
@@ -26547,13 +26346,41 @@ class HttpUpstreamClient {
       signal.removeEventListener("abort", abortFromCaller);
     }
   }
+  async exportMindMap(options) {
+    this.logger?.info("calling MindGeniusAI export endpoint", { formats: options.formats });
+    const response = await fetch(`${this.baseUrl}/api/export`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mindMap: options.mindMap,
+        markdown: options.markdown,
+        formats: options.formats
+      }),
+      signal: options.signal
+    });
+    if (!response.ok) {
+      this.logger?.error("MindGeniusAI export endpoint failed", { status: response.status });
+      throw new Error(`upstream /api/export failed with ${response.status}`);
+    }
+    const body = await response.json();
+    if (!Array.isArray(body.artifacts)) {
+      this.logger?.error("MindGeniusAI export response did not contain artifacts");
+      throw new Error("upstream export response did not contain artifacts");
+    }
+    for (const format of options.formats) {
+      const artifact = body.artifacts.find((item) => item.format === format);
+      if (!artifact?.dataBase64)
+        throw new Error(`upstream export response missing ${format}`);
+    }
+    return body.artifacts;
+  }
   async uploadDocument(path, displayName, signal) {
     this.logger?.info("uploading document to MindGeniusAI", { displayName, path });
     const file = Bun.file(path);
     if (await file.size > 10 * 1024 * 1024)
       throw new Error("PDF exceeds upstream 10 MB limit");
     const form = new FormData;
-    form.set("file", file, displayName ?? basename2(path));
+    form.set("file", file, displayName ?? basename(path));
     const response = await fetch(`${this.baseUrl}/api/uploadFile`, {
       method: "POST",
       body: form,
@@ -26589,9 +26416,12 @@ class HttpUpstreamClient {
     try {
       const response = await fetch(`${this.baseUrl}/api/health`, { signal });
       this.logger?.debug("MindGeniusAI health response", { status: response.status });
+      if (response.ok)
+        this.lastHealthError = undefined;
       return response.ok;
     } catch (error2) {
-      this.logger?.debug("MindGeniusAI health check failed", { error: String(error2) });
+      this.lastHealthError = String(error2);
+      this.logger?.debug("MindGeniusAI health check pending");
       return false;
     }
   }
@@ -26608,6 +26438,7 @@ class HttpUpstreamClient {
     }
     this.logger?.info("installing MindGeniusAI dependencies", { command: this.installCommand });
     this.installPromise ??= this.runInstallCommand(this.installCommand, {
+      cwd: this.workingDirectory,
       env: this.upstreamEnv,
       logger: this.logger
     });
@@ -26619,6 +26450,7 @@ function defaultStartUpstream(command, options) {
   const logger = options?.logger;
   const debugOutput = logger?.level === "DEBUG";
   const process3 = Bun.spawn(command.split(/\s+/), {
+    cwd: options?.cwd,
     stdout: debugOutput ? "pipe" : "ignore",
     stderr: debugOutput ? "pipe" : "ignore",
     env: options?.env
@@ -26633,6 +26465,7 @@ async function defaultRunCommand(command, options) {
   const logger = options?.logger;
   const debugOutput = logger?.level === "DEBUG";
   const process3 = Bun.spawn(command.split(/\s+/), {
+    cwd: options?.cwd,
     stdout: debugOutput ? "pipe" : "ignore",
     stderr: debugOutput ? "pipe" : "ignore",
     env: options?.env
@@ -26688,15 +26521,15 @@ function sleep(ms, signal) {
 
 // src/mcp/toolDescriptions.ts
 var toolDescriptions = {
-  mindmap_create: "Create a new persistent MindGeniusAI mind-map plan and queue the first generation run. Use this first for a new requested map. Do not wait inside the tool for generation to finish. Next action: call mindmap_get_status with the returned planningId.",
-  mindmap_continue: "Continue an existing persistent plan with a new instruction, using the previous messages and current mindMap state. Use only after mindmap_create has returned a planningId. Do not start concurrent continuations for the same planningId. Next action: call mindmap_get_status.",
+  mindmap_create: "Create a new in-memory MindGeniusAI mind-map plan and queue the first generation run. Use this first for a new requested map. Do not wait inside the tool for generation to finish. Next action: call mindmap_get_status with the returned planningId.",
+  mindmap_continue: "Continue an existing in-memory plan with a new instruction, using the previous messages and current mindMap state. Use only after mindmap_create has returned a planningId. Do not start concurrent continuations for the same planningId. Next action: call mindmap_get_status.",
   mindmap_get_status: "Return short progress metadata for a plan. Use this for polling. Do not use it to fetch the full map or event log. Next action: poll again, call mindmap_get_result if completed, or report the failure.",
   mindmap_get_result: "Return the current or final mind-map result in outline, markdown, or summary form. Use after status is completed or when the current snapshot is explicitly needed. Do not use this for polling. Next action: call mindmap_export for OPML and PNG.",
   mindmap_cancel: "Cancel a queued or running plan run and abort the upstream HTTP/SSE stream. Use when the user asks to stop generation. Do not treat cancellation as a successful export. Next action: call mindmap_get_status if confirmation is needed.",
   mindmap_list: "List the caller-owned plans with short metadata. Use when the user asks what plans exist. Do not expose another owner\u2019s plans. Next action: choose a planningId and call mindmap_get_status or mindmap_get_result.",
   mindmap_document_add: "Register a local PDF document and upload it to MindGeniusAI for later RAG use. Use before mindmap_document_index. Do not pass arbitrary URLs or large base64 content through the LLM context. Next action: call mindmap_document_index with the returned documentId.",
   mindmap_document_index: "Initialize the uploaded PDF document in the upstream RAG index. Use after mindmap_document_add and before mindmap_create with documentId. Do not start duplicate indexing for the same documentId. Next action: call mindmap_create with documentId.",
-  mindmap_export: "Export a committed plan version. Use as the required final step after a map is complete. Do not return OPML or PNG inline; return resource links for large artifacts. Next action: read the returned resources only when needed.",
+  mindmap_export: "Create versioned export resource links for a committed plan version. Use as the required final step after a map is complete. Do not return OPML or PNG inline; the resource read calls MindGeniusAI export lazily. Next action: read the returned resources only when needed.",
   mindmap_guide: "Return the deterministic AI-readable recipe for using this MCP server correctly. Use when tool order is uncertain. Do not replace the actual tool calls with a prose answer. Next action: follow the recipe through mindmap_export."
 };
 
@@ -26716,12 +26549,13 @@ async function startStdioServer(options = {}) {
     upstreamEnv: redactForLog(config2.upstreamEnv),
     upstreamInstallCheckPath: config2.upstreamInstallCheckPath,
     upstreamInstallCommand: config2.upstreamInstallCommand,
-    upstreamStartCommand: config2.upstreamStartCommand
+    upstreamStartCommand: config2.upstreamStartCommand,
+    upstreamWorkingDirectory: config2.upstreamWorkingDirectory
   });
   const service = options.service ?? createDefaultService(config2, logger);
   const server = options.server ?? createMcpServer();
-  await service.recoverPendingRuns();
-  logger.info("pending runs recovered");
+  const recovered = await service.recoverPendingRuns();
+  logger.info("pending runs recovered", { recovered });
   registerTools(server, service);
   registerResources(server, service);
   await server.connect(options.transport ?? createStdioTransport());
@@ -26736,7 +26570,7 @@ function createMcpServer() {
     name: "easter-mind-map-mcp",
     version: "0.1.0"
   }, {
-    instructions: "This server manages persistent MindGeniusAI mind-map plans. Always call mindmap_create first, preserve returned IDs exactly, poll with mindmap_get_status, fetch result only when needed, and finish with mindmap_export using opml and png."
+    instructions: "This server manages in-memory MindGeniusAI mind-map plans. Always call mindmap_create first, preserve returned IDs exactly, poll with mindmap_get_status, fetch result only when needed, and finish with mindmap_export using opml and png."
   });
 }
 function createStdioTransport() {
@@ -26744,8 +26578,8 @@ function createStdioTransport() {
 }
 function makeDefaultComponents(config2, logger) {
   return {
-    store: new FileStore(config2.dataDir),
-    upstream: new HttpUpstreamClient(config2.upstreamBaseUrl, config2.upstreamStartCommand, config2.upstreamHealthTimeoutMs, undefined, config2.concurrency.upstreamRequestTimeoutMs, config2.upstreamInstallCommand, config2.upstreamInstallCheckPath, config2.upstreamEnv, undefined, logger)
+    store: new MemoryStore,
+    upstream: new HttpUpstreamClient(config2.upstreamBaseUrl, config2.upstreamStartCommand, config2.upstreamHealthTimeoutMs, undefined, config2.concurrency.upstreamRequestTimeoutMs, config2.upstreamInstallCommand, config2.upstreamInstallCheckPath, config2.upstreamEnv, undefined, logger, config2.upstreamWorkingDirectory)
   };
 }
 function registerTools(server, service) {
@@ -26827,14 +26661,16 @@ function exportToolResult(planningId, result) {
   return {
     content: [
       { type: "text", text: JSON.stringify(result, null, 2) },
-      ...artifacts.map((artifact) => ({
-        type: "resource_link",
-        uri: artifact.resourceUri,
-        name: `${planningId}-${artifact.format}`,
-        title: `Mind-map ${artifact.format.toUpperCase()} export`,
-        size: artifact.bytes,
-        mimeType: artifactMimeType(artifact.format)
-      }))
+      ...artifacts.map((artifact) => {
+        const link = {
+          type: "resource_link",
+          uri: artifact.resourceUri,
+          name: `${planningId}-${artifact.format}`,
+          title: `Mind-map ${artifact.format.toUpperCase()} export`,
+          mimeType: artifactMimeType(artifact.format)
+        };
+        return artifact.bytes === undefined ? link : { ...link, size: artifact.bytes };
+      })
     ]
   };
 }
@@ -26864,7 +26700,9 @@ function registerResources(server, service) {
   server.registerResource("mindmap_plan_outline", new ResourceTemplate("mindmap://plans/{planningId}/outline", { list: undefined }), { title: "Mind-map outline", mimeType: "application/json" }, read);
   server.registerResource("mindmap_plan_markdown", new ResourceTemplate("mindmap://plans/{planningId}/markdown", { list: undefined }), { title: "Mind-map markdown", mimeType: "text/markdown" }, read);
   server.registerResource("mindmap_plan_events", new ResourceTemplate("mindmap://plans/{planningId}/events", { list: undefined }), { title: "Mind-map event log", mimeType: "application/x-ndjson" }, read);
-  server.registerResource("mindmap_export", new ResourceTemplate("mindmap://exports/{planningId}/{format}", { list: undefined }), { title: "Mind-map export artifact" }, read);
+  server.registerResource("mindmap_export", new ResourceTemplate("mindmap://exports/{planningId}/{version}/{format}", {
+    list: undefined
+  }), { title: "Mind-map export artifact" }, read);
 }
 
 // src/index.ts

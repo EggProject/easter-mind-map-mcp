@@ -45,7 +45,16 @@ interface UiState {
   leftCollapsed: boolean
   sourcesOpen: boolean
   settingsOpen: boolean
+  /** ⌘K 命令面板（画廊 + 文档搜索）是否打开 */
+  paletteOpen: boolean
+  setPaletteOpen: (open: boolean) => void
   toast: string | null
+  /** 需要进入重命名编辑态的节点 id（加子/兄弟节点或 F2 后置位，TopicNode 消费后清空） */
+  editingNodeId: string | null
+  setEditingNodeId: (id: string | null) => void
+  /** 拖拽改父时鼠标悬停的合法落点节点 id，用于高亮提示 */
+  dropTargetId: string | null
+  setDropTargetId: (id: string | null) => void
   setProvider: (provider: Provider) => void
   setApiKey: (key: string) => void
   setProxy: (proxy: string) => void
@@ -86,8 +95,13 @@ export const useUiStore = create<UiState>(set => ({
   leftCollapsed: typeof window !== 'undefined' && window.innerWidth < 1280,
   sourcesOpen: false,
   settingsOpen: false,
+  paletteOpen: false,
   toast: null,
+  editingNodeId: null,
+  dropTargetId: null,
 
+  setEditingNodeId: editingNodeId => set({ editingNodeId }),
+  setDropTargetId: dropTargetId => set({ dropTargetId }),
   setProvider(provider) {
     storageManager.set(StorageKey.LLM_PROVIDER, provider)
     set({ provider })
@@ -133,6 +147,7 @@ export const useUiStore = create<UiState>(set => ({
   setLeftCollapsed: leftCollapsed => set({ leftCollapsed }),
   setSourcesOpen: sourcesOpen => set({ sourcesOpen }),
   setSettingsOpen: settingsOpen => set({ settingsOpen }),
+  setPaletteOpen: paletteOpen => set({ paletteOpen }),
   flash(message) {
     clearTimeout(toastTimer)
     set({ toast: message })
