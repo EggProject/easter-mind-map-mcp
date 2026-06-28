@@ -9,29 +9,42 @@
 - HTTP-n elérhető MindGeniusAI upstream szerver
 - Stdio szervert indítani tudó MCP host
 
-## Függőségek telepítése
+## Repo klónozása
 
-Meglévő checkout esetén először húzd le a legfrissebb commitolt runtime
-artifactot:
+Először hozz létre egy lokális checkoutot:
+
+```bash
+git clone https://github.com/EggProject/easter-mind-map-mcp.git
+cd easter-mind-map-mcp
+```
+
+A repo commitolja a `dist/index.js` fájlt. Az MCP hostokat erre a fájlra
+konfiguráld, ne a TypeScript forrásfájlra.
+
+Meglévő checkout esetén az MCP host újraindítása előtt húzd le a legfrissebb
+commitolt runtime artifactot:
 
 ```bash
 git pull
 ```
 
+## Fejlesztői függőségek
+
+A repo függőségeit csak fejlesztéshez, tesztekhez vagy forrásmódosítás utáni
+`dist/index.js` frissítéshez kell telepíteni:
+
 ```bash
 bun install
 ```
 
-Futtasd a szervert közvetlenül a commitolt runtime artifactból:
+Közvetlen protokoll smoke testhez futtasd a commitolt runtime artifactot:
 
 ```bash
 bun dist/index.js
 ```
 
-A repo commitolja a `dist/index.js` fájlt. Az MCP hostokat erre a fájlra
-konfiguráld, ne a TypeScript forrásfájlra. A `bun run build` csak saját
-fejlesztéskor kell, amikor forrásmódosítás után frissíted a `dist/index.js`
-fájlt.
+A `bun run build` csak saját fejlesztéskor kell, amikor forrásmódosítás után
+frissíted a `dist/index.js` fájlt.
 
 ## MCP szerver közvetlen futtatása
 

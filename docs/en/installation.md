@@ -9,27 +9,42 @@
 - A MindGeniusAI upstream server reachable over HTTP
 - An MCP host that can launch a stdio server
 
-## Install dependencies
+## Clone the repository
 
-For an existing checkout, pull the latest committed runtime artifact first:
+Create a local checkout first:
+
+```bash
+git clone https://github.com/EggProject/easter-mind-map-mcp.git
+cd easter-mind-map-mcp
+```
+
+The repository commits `dist/index.js`. Configure MCP hosts to run that file,
+not the TypeScript source file.
+
+For an existing checkout, pull the latest committed runtime artifact before
+restarting the MCP host:
 
 ```bash
 git pull
 ```
 
+## Development dependencies
+
+You only need dependencies in this repository when developing, running tests, or
+refreshing `dist/index.js` after source changes:
+
 ```bash
 bun install
 ```
 
-Run the server directly from the committed runtime artifact:
+For a direct protocol smoke test, run the committed runtime artifact:
 
 ```bash
 bun dist/index.js
 ```
 
-The repository commits `dist/index.js`. Configure MCP hosts to run that file,
-not the TypeScript source file. You only need `bun run build` when developing
-against changed source files and refreshing `dist/index.js`.
+You only need `bun run build` when developing against changed source files and
+refreshing `dist/index.js`.
 
 ## Run the MCP server directly
 

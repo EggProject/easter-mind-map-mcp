@@ -3,6 +3,7 @@
 > In-memory MCP adapter for MindGeniusAI mind-map generation, refinement, resources, and exports.
 
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](package.json)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Bun%20%3E%3D1.3.0-black.svg)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.x-blue.svg)](tsconfig.json)
 [![English](https://img.shields.io/badge/Docs-English-blue)](README.md)
@@ -25,38 +26,42 @@ calls a MindGeniusAI HTTP/SSE upstream configured with environment variables.
 
 ## Quick start
 
-Install both runtime tools before wiring the server into an MCP host:
-
-- Bun `>=1.3.0` runs this adapter and executes `dist/index.js`.
-- pnpm must be available on `PATH` because the bundled `original-MindGeniusAI`
-  upstream uses it for automatic install/start.
-
-In the repository checkout, update the committed runtime artifact and install
-dependencies:
+Clone the repository:
 
 ```bash
-git pull
-bun install
-bun dist/index.js
+git clone https://github.com/EggProject/easter-mind-map-mcp.git
+cd easter-mind-map-mcp
 ```
 
-The committed `dist/index.js` is the runtime entrypoint for MCP hosts. Build from
-source only when you change the TypeScript files during your own development.
-When the upstream is not already healthy, the adapter starts the bundled
-`original-MindGeniusAI` server automatically with `pnpm --dir
-original-MindGeniusAI dev:server`.
-Set MindGeniusAI provider variables such as `EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_LLM_PROVIDER` and
-`EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_API_KEY` in the MCP host environment.
-They must be visible to the `bun dist/index.js` process when it starts. Shell
-startup files such as `~/.zshrc` only work when the MCP host itself was launched
-from that shell session; otherwise put the variables in the MCP host `env`
-block.
+Then point your MCP host at the committed runtime file:
+
+```json
+{
+  "mcpServers": {
+    "easter-mind-map": {
+      "command": "bun",
+      "args": ["dist/index.js"],
+      "cwd": "/absolute/path/to/easter-mind-map-mcp",
+      "env": {
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_LLM_PROVIDER": "minimax",
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_API_KEY": "sk-...",
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_MODEL": "MiniMax-M3",
+        "EASTER_MIND_MAP_MCP_MINDMAP_DOCUMENT_ROOTS": "documents"
+      }
+    }
+  }
+}
+```
+
+The MCP host runs `bun dist/index.js` from this repository. Bun `>=1.3.0` must
+be available, and pnpm must be on `PATH` because the bundled
+`original-MindGeniusAI` upstream uses it when the adapter starts the upstream
+automatically.
+For an existing checkout, run `git pull` before restarting the MCP host.
+
 See [MCP host setup](docs/en/installation.md#configure-an-mcp-host) and the
 [environment variable reference](docs/en/configuration.md#environment-variables)
-for the complete settings block.
-Logging is off by default with `EASTER_MIND_MAP_MCP_LOGLEVEL=NONE`; set
-`EASTER_MIND_MAP_MCP_LOGLEVEL=DEBUG` to write detailed adapter and MindGeniusAI
-server output to `/tmp/easter-mind-map-mcp/logs/mcp.log` by default.
+for the full settings list.
 
 For MCP host setup, upstream configuration, and the required tool flow, use the
 split documentation below instead of keeping everything in this file.
@@ -98,4 +103,4 @@ original-MindGeniusAI/  Upstream MindGeniusAI application snapshot
 
 ## License
 
-No root `LICENSE` file is declared in this adapter repository.
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
