@@ -38,7 +38,7 @@ export const config = {
       baseURL: process.env.MOONSHOT_BASE_URL ?? 'https://api.moonshot.cn/v1',
       model: process.env.MOONSHOT_MODEL ?? 'moonshot-v1-8k',
     },
-    // MiniMax —— OpenAI 协议兼容，走 createOpenAI + baseURL
+    // Easter MCP custom provider: MiniMax is OpenAI-compatible but needs its own env names.
     minimax: {
       apiKey: process.env.MINIMAX_API_KEY,
       baseURL: process.env.MINIMAX_BASE_URL ?? 'https://api.minimax.io/v1',

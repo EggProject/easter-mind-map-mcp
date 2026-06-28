@@ -7,8 +7,8 @@ describe('MCP server tool result shaping', () => {
       planningId: 'plan_1',
       version: 1,
       artifacts: [
-        { format: 'opml', resourceUri: 'mindmap://exports/plan_1/opml', bytes: 10 },
-        { format: 'png', resourceUri: 'mindmap://exports/plan_1/png', bytes: 20 },
+        { format: 'opml', resourceUri: 'mindmap://exports/plan_1/1/opml' },
+        { format: 'png', resourceUri: 'mindmap://exports/plan_1/1/png' },
       ],
     })
 
@@ -18,11 +18,11 @@ describe('MCP server tool result shaping', () => {
       'resource_link',
     ])
     expect(result.content[1]).toMatchObject({
-      uri: 'mindmap://exports/plan_1/opml',
+      uri: 'mindmap://exports/plan_1/1/opml',
       mimeType: 'text/x-opml',
     })
     expect(result.content[2]).toMatchObject({
-      uri: 'mindmap://exports/plan_1/png',
+      uri: 'mindmap://exports/plan_1/1/png',
       mimeType: 'image/png',
     })
   })

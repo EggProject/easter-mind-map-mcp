@@ -4,13 +4,14 @@ import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'bun:test'
 import { loadConfig } from '../src/config'
 import { MindMapService } from '../src/service'
-import { FileStore } from '../src/store'
-import type { RunAgentOptions, UpstreamClient } from '../src/types'
+import { MemoryStore } from '../src/store'
+import type { ExportArtifact, RunAgentOptions, UpstreamClient } from '../src/types'
 
 class FakeUpstream implements UpstreamClient {
   active = 0
   maxActive = 0
   indexCalls = 0
+  exportCalls: Array<Array<'opml' | 'png' | 'markdown'>> = []
   requests: RunAgentOptions['request'][] = []
   fail = false
   failIndex = false
@@ -46,6 +47,13 @@ class FakeUpstream implements UpstreamClient {
     return 'uploaded.pdf'
   }
 
+  async exportMindMap(options: {
+    formats: Array<'opml' | 'png' | 'markdown'>
+  }): Promise<ExportArtifact[]> {
+    this.exportCalls.push(options.formats)
+    return options.formats.map((format) => fakeArtifact(format))
+  }
+
   async indexDocument(): Promise<void> {
     this.indexCalls += 1
     await delay(20)
@@ -54,7 +62,7 @@ class FakeUpstream implements UpstreamClient {
 }
 
 describe('mind map service', () => {
-  it('creates persistent ids and commits completed output', async () => {
+  it('creates in-memory ids and commits completed output', async () => {
     const { service } = await makeService()
     const created = await service.create({ ownerId: 'u1', prompt: 'Plan Easter' })
     expect(created.planningId).toStartWith('plan_')
@@ -79,12 +87,17 @@ describe('mind map service', () => {
   })
 
   it('resource-links OPML and PNG exports', async () => {
-    const { service } = await makeService()
+    const { service, upstream } = await makeService()
     const created = await service.create({ ownerId: 'u1', prompt: 'A' })
+    let exported: Record<string, unknown> = {}
     await eventually(async () => {
-      const exported = await service.export('u1', created.planningId, ['opml', 'png'])
+      exported = await service.export('u1', created.planningId, ['markdown', 'opml', 'png'])
       expect(JSON.stringify(exported)).toContain('mindmap://exports/')
     })
+    expect(JSON.stringify(exported)).toContain(`mindmap://exports/${created.planningId}/1/png`)
+    expect(upstream.exportCalls).toEqual([])
+    await service.readResource('u1', `mindmap://exports/${created.planningId}/1/png`)
+    expect(upstream.exportCalls).toEqual([['png']])
   })
 
   it('settles upstream runs without leaked active streams', async () => {
@@ -99,39 +112,11 @@ describe('mind map service', () => {
     expect(upstream.maxActive).toBeLessThanOrEqual(2)
   })
 
-  it('recovers queued and running runs after a service restart', async () => {
+  it('does not recover runs after restart because runtime state is memory-only', async () => {
     const dataDir = await mkdtemp(join(tmpdir(), 'mindmap-recover-'))
-    const store = new FileStore(dataDir)
-    const now = new Date().toISOString()
-    await store.savePlan({
-      id: 'plan_restart',
-      ownerId: 'u1',
-      status: 'running',
-      version: 0,
-      messages: [{ role: 'user', content: 'Recover me' }],
-      metadata: {},
-      createdAt: now,
-      updatedAt: now,
-    })
-    await store.saveRun({
-      id: 'run_restart',
-      planningId: 'plan_restart',
-      ownerId: 'u1',
-      status: 'running',
-      instruction: 'Recover me',
-      baseVersion: 0,
-      startedAt: now,
-      retryCount: 0,
-      completedSteps: 0,
-    })
-
-    const upstream = new FakeUpstream()
-    const service = new MindMapService(new FileStore(dataDir), upstream, makeConfig(dataDir))
-    expect(await service.recoverPendingRuns()).toBe(1)
-    await eventually(async () => {
-      const result = await service.getResult('u1', 'plan_restart', 'summary')
-      expect(result.status).toBe('completed')
-    })
+    const service = new MindMapService(new MemoryStore(), new FakeUpstream(), makeConfig(dataDir))
+    expect(await service.recoverPendingRuns()).toBe(0)
+    await expect(service.getResult('u1', 'plan_restart', 'summary')).rejects.toThrow()
   })
 
   it('serializes continuations for the same plan while allowing different plans', async () => {
@@ -185,7 +170,7 @@ describe('mind map service', () => {
 
   it('summarizes plans without a committed mind map', async () => {
     const dataDir = await mkdtemp(join(tmpdir(), 'mindmap-summary-'))
-    const store = new FileStore(dataDir)
+    const store = new MemoryStore()
     const now = new Date().toISOString()
     await store.savePlan({
       id: 'plan_empty',
@@ -305,18 +290,31 @@ async function makeService(): Promise<{
   const upstream = new FakeUpstream()
   const config = makeConfig(dataDir)
   return {
-    service: new MindMapService(new FileStore(dataDir), upstream, config),
+    service: new MindMapService(new MemoryStore(), upstream, config),
     upstream,
     dataDir,
   }
 }
 
+function fakeArtifact(format: 'opml' | 'png' | 'markdown'): ExportArtifact {
+  const text = format === 'png' ? 'png-bytes' : `${format}-text`
+  return {
+    planningId: 'upstream-plan',
+    version: 1,
+    format,
+    mediaType: format === 'png' ? 'image/png' : format === 'opml' ? 'text/x-opml' : 'text/markdown',
+    bytes: new TextEncoder().encode(text).byteLength,
+    dataBase64: Buffer.from(text).toString('base64'),
+    createdAt: new Date().toISOString(),
+  }
+}
+
 function makeConfig(dataDir: string) {
   return loadConfig({
-    MINDMAP_DATA_DIR: dataDir,
-    MINDMAP_MAX_RUNS_GLOBAL: '2',
-    MINDMAP_MAX_RUNS_PER_OWNER: '2',
-    MINDMAP_DOCUMENT_ROOTS: dataDir,
+    EASTER_MIND_MAP_MCP_MINDMAP_DATA_DIR: dataDir,
+    EASTER_MIND_MAP_MCP_MINDMAP_MAX_RUNS_GLOBAL: '2',
+    EASTER_MIND_MAP_MCP_MINDMAP_MAX_RUNS_PER_OWNER: '2',
+    EASTER_MIND_MAP_MCP_MINDMAP_DOCUMENT_ROOTS: dataDir,
   })
 }
 

@@ -108,11 +108,21 @@ function encodePng(width: number, height: number, rgba: Uint8Array): Uint8Array 
     raw.set(rgba.subarray(y * width * 4, (y + 1) * width * 4), rowStart + 1)
   }
   const chunks = [
-    chunk('IHDR', u32(width, height, 8, 6, 0, 0, 0)),
+    chunk('IHDR', pngHeader(width, height)),
     chunk('IDAT', deflateSync(raw)),
     chunk('IEND', new Uint8Array()),
   ]
   return concat(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), ...chunks)
+}
+
+function pngHeader(width: number, height: number): Uint8Array {
+  const header = new Uint8Array(13)
+  const view = new DataView(header.buffer)
+  view.setUint32(0, width >>> 0)
+  view.setUint32(4, height >>> 0)
+  header[8] = 8
+  header[9] = 6
+  return header
 }
 
 function chunk(type: string, data: Uint8Array): Uint8Array {

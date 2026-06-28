@@ -6,8 +6,8 @@ import { loadConfig } from '../src/config'
 import { GUIDE } from '../src/service'
 import { MindMapService } from '../src/service'
 import { toolDescriptions } from '../src/mcp/toolDescriptions'
-import { FileStore } from '../src/store'
-import type { RunAgentOptions, UpstreamClient } from '../src/types'
+import { MemoryStore } from '../src/store'
+import type { ExportArtifact, RunAgentOptions, UpstreamClient } from '../src/types'
 
 describe('tool autonomy wording', () => {
   it('tells the host the required chain and export finish', () => {
@@ -15,6 +15,10 @@ describe('tool autonomy wording', () => {
     expect(GUIDE).toContain('mindmap_get_status')
     expect(GUIDE).toContain('mindmap_get_result')
     expect(GUIDE).toContain("mindmap_export(planningId, formats:['opml','png'])")
+    expect(GUIDE).toContain('Document-grounded flow')
+    expect(GUIDE).toContain('mindmap_document_add')
+    expect(GUIDE).toContain('mindmap_document_index')
+    expect(GUIDE).toContain('Never invent')
   })
 
   it('each tool description contains use, do-not, and next-action guidance', () => {
@@ -28,9 +32,12 @@ describe('tool autonomy wording', () => {
   it('simulates an MCP host following the guide through create/status/result/export', async () => {
     const dataDir = await mkdtemp(join(tmpdir(), 'mindmap-autonomy-'))
     const service = new MindMapService(
-      new FileStore(dataDir),
+      new MemoryStore(),
       new AutonomyUpstream(),
-      loadConfig({ MINDMAP_DATA_DIR: dataDir, MINDMAP_DOCUMENT_ROOTS: dataDir }),
+      loadConfig({
+        EASTER_MIND_MAP_MCP_MINDMAP_DATA_DIR: dataDir,
+        EASTER_MIND_MAP_MCP_MINDMAP_DOCUMENT_ROOTS: dataDir,
+      }),
     )
 
     const transcript = await simulateHostFromGuide(service, 'local', 'Plan an Easter project')
@@ -52,6 +59,21 @@ class AutonomyUpstream implements UpstreamClient {
 
   async uploadDocument(): Promise<string> {
     return 'doc.pdf'
+  }
+
+  async exportMindMap(options: {
+    formats: Array<'opml' | 'png' | 'markdown'>
+  }): Promise<ExportArtifact[]> {
+    return options.formats.map((format) => ({
+      planningId: 'upstream-plan',
+      version: 1,
+      format,
+      mediaType:
+        format === 'png' ? 'image/png' : format === 'opml' ? 'text/x-opml' : 'text/markdown',
+      bytes: 4,
+      dataBase64: 'AAAA',
+      createdAt: new Date().toISOString(),
+    }))
   }
 
   async indexDocument(): Promise<void> {}

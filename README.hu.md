@@ -1,8 +1,9 @@
 # easter-mind-map-mcp
 
-> Perzisztens MCP adapter MindGeniusAI mind map generáláshoz, finomításhoz, erőforrásokhoz és exportokhoz.
+> Memória alapú MCP adapter MindGeniusAI mind map generáláshoz, finomításhoz, erőforrásokhoz és exportokhoz.
 
 [![Verzió](https://img.shields.io/badge/verzi%C3%B3-0.1.0-blue.svg)](package.json)
+[![Licenc](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Runtime](https://img.shields.io/badge/runtime-Bun%20%3E%3D1.3.0-black.svg)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.x-blue.svg)](tsconfig.json)
 [![English](https://img.shields.io/badge/Docs-English-blue)](README.md)
@@ -15,28 +16,54 @@
 ## Mi ez?
 
 Az **`easter-mind-map-mcp`** egy Bun és TypeScript alapú MCP szerver, amely a
-MindGeniusAI upstream alkalmazást perzisztens, hostbarát eszközök mögé teszi.
-Lokálisan tárolja a tervállapotot, sorba rendezi a futásokat, stabil ID-kat
-őriz meg, MCP erőforrásokat ad a tervadatokhoz, és a kész mapeket OPML, PNG
-vagy Markdown formátumba exportálja.
+MindGeniusAI upstream alkalmazást hostbarát eszközök mögé teszi. A tervállapotot
+az aktuális MCP process memóriájában tartja, sorba rendezi a futásokat, a process
+élettartamán belül stabil ID-kat őriz meg, MCP erőforrásokat ad a tervadatokhoz,
+és a kész mapeket lazy resource read során exportálja OPML, PNG vagy Markdown
+formátumba.
 
 A szerver stdio-n keresztül beszél MCP-t. Saját HTTP API-t nem nyit; egy
 környezeti változókkal beállított MindGeniusAI HTTP/SSE upstreamet hív.
 
 ## Gyors kezdés
 
+Klónozd a repót:
+
 ```bash
-bun install
-bun dist/index.js
+git clone https://github.com/EggProject/easter-mind-map-mcp.git
+cd easter-mind-map-mcp
 ```
 
-A commitolt `dist/index.js` az MCP hostok runtime entrypointja. Fordítani csak
-akkor kell, ha saját fejlesztés közben TypeScript forrásfájlokat módosítasz.
-Ha az upstream még nem healthy, az adapter automatikusan elindítja a bundled
-`original-MindGeniusAI` szervert a `pnpm --dir original-MindGeniusAI dev:server`
-paranccsal.
-A MindGeniusAI provider változókat, például `MINDGENIUS_ENV_LLM_PROVIDER` és
-`MINDGENIUS_ENV_MINIMAX_API_KEY`, az MCP host env-jében add meg.
+Ezután az MCP hostot a commitolt runtime fájlra állítsd:
+
+```json
+{
+  "mcpServers": {
+    "easter-mind-map": {
+      "command": "bun",
+      "args": ["dist/index.js"],
+      "cwd": "/absolute/path/to/easter-mind-map-mcp",
+      "env": {
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_LLM_PROVIDER": "minimax",
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_API_KEY": "sk-...",
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_MODEL": "MiniMax-M3",
+        "EASTER_MIND_MAP_MCP_MINDMAP_DOCUMENT_ROOTS": "documents"
+      }
+    }
+  }
+}
+```
+
+Az MCP host a `bun dist/index.js` parancsot futtatja ebből a repóból. Bun
+`>=1.3.0` szükséges, a pnpm pedig legyen a `PATH`-on, mert a bundled
+`original-MindGeniusAI` upstream ezt használja, amikor az adapter automatikusan
+elindítja az upstreamet.
+Meglévő checkout esetén az MCP host újraindítása előtt futtasd a `git pull`
+parancsot.
+
+Lásd az [MCP host bekötést](docs/hu/installation.md) és a
+[környezeti változók listáját](docs/hu/configuration.md) a teljes beállítási
+listához.
 
 Az MCP host bekötéséhez, az upstream beállításához és a kötelező tool flow-hoz
 használd az alább szétbontott dokumentációt, ne ezt az egy fájlt.
@@ -78,4 +105,4 @@ original-MindGeniusAI/  Upstream MindGeniusAI alkalmazas snapshot
 
 ## Licenc
 
-Ebben az adapter repóban nincs root `LICENSE` fájl deklarálva.
+Ez a projekt MIT licenc alatt érhető el. Lásd: [LICENSE](LICENSE).

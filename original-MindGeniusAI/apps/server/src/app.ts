@@ -5,6 +5,7 @@ import { logger } from './lib/logger'
 import { agentRoutes } from './routes/agent'
 import { chatRoutes } from './routes/chat'
 import { documentRoutes } from './routes/documents'
+import { exportRoutes } from './routes/export'
 
 export function createApp() {
   const app = new Hono()
@@ -20,6 +21,7 @@ export function createApp() {
   app.route('/api', chatRoutes)
   app.route('/api', documentRoutes)
   app.route('/api', agentRoutes)
+  app.route('/api', exportRoutes)
 
   // 设置 WEB_DIR 时单进程一体化：API 之后兜底托管已构建的 web 产物
   if (config.webDir) {

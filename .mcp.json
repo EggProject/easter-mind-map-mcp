@@ -5,6 +5,17 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
       "env": {}
+    },
+    "easter-mind-map": {
+      "command": "bun",
+      "args": ["dist/index.js"],
+      "cwd": ".",
+      "env": {
+        "MINDGENIUS_ENV_LLM_PROVIDER": "minimax",
+        "MINDGENIUS_ENV_MINIMAX_MODEL": "MiniMax-M3",
+        "MINDMAP_DATA_DIR": "data",
+        "MINDMAP_DOCUMENT_ROOTS": "documents"
+      }
     }
   }
 }

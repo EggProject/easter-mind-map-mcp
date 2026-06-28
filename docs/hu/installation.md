@@ -9,22 +9,42 @@
 - HTTP-n elérhető MindGeniusAI upstream szerver
 - Stdio szervert indítani tudó MCP host
 
-## Függőségek telepítése
+## Repo klónozása
+
+Először hozz létre egy lokális checkoutot:
+
+```bash
+git clone https://github.com/EggProject/easter-mind-map-mcp.git
+cd easter-mind-map-mcp
+```
+
+A repo commitolja a `dist/index.js` fájlt. Az MCP hostokat erre a fájlra
+konfiguráld, ne a TypeScript forrásfájlra.
+
+Meglévő checkout esetén az MCP host újraindítása előtt húzd le a legfrissebb
+commitolt runtime artifactot:
+
+```bash
+git pull
+```
+
+## Fejlesztői függőségek
+
+A repo függőségeit csak fejlesztéshez, tesztekhez vagy forrásmódosítás utáni
+`dist/index.js` frissítéshez kell telepíteni:
 
 ```bash
 bun install
 ```
 
-Futtasd a szervert közvetlenül a commitolt runtime artifactból:
+Közvetlen protokoll smoke testhez futtasd a commitolt runtime artifactot:
 
 ```bash
 bun dist/index.js
 ```
 
-A repo commitolja a `dist/index.js` fájlt. Az MCP hostokat erre a fájlra
-konfiguráld, ne a TypeScript forrásfájlra. A `bun run build` csak saját
-fejlesztéskor kell, amikor forrásmódosítás után frissíted a `dist/index.js`
-fájlt.
+A `bun run build` csak saját fejlesztéskor kell, amikor forrásmódosítás után
+frissíted a `dist/index.js` fájlt.
 
 ## MCP szerver közvetlen futtatása
 
@@ -48,12 +68,11 @@ A repo gyökerét add meg working directoryként, hogy a relatív utak, példáu
       "args": ["dist/index.js"],
       "cwd": "/absolute/path/to/easter-mind-map-mcp",
       "env": {
-        "MINDGENIUS_BASE_URL": "http://127.0.0.1:8787",
-        "MINDGENIUS_ENV_LLM_PROVIDER": "minimax",
-        "MINDGENIUS_ENV_MINIMAX_API_KEY": "sk-...",
-        "MINDGENIUS_ENV_MINIMAX_MODEL": "MiniMax-M3",
-        "MINDMAP_DATA_DIR": "data",
-        "MINDMAP_DOCUMENT_ROOTS": "documents"
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_BASE_URL": "http://127.0.0.1:8787",
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_LLM_PROVIDER": "minimax",
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_API_KEY": "sk-...",
+        "EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_MODEL": "MiniMax-M3",
+        "EASTER_MIND_MAP_MCP_MINDMAP_DOCUMENT_ROOTS": "documents"
       }
     }
   }
@@ -63,12 +82,20 @@ A repo gyökerét add meg working directoryként, hogy a relatív utak, példáu
 Saját fejlesztés közben minden forrásmódosítás után futtasd újra a
 `bun run build` parancsot, mielőtt újraindítod az MCP hostot.
 
+A provider változóknak annak az MCP szerver processnek a környezetében kell
+benne lenniük, amelyik a `bun dist/index.js` parancsot futtatja. A `~/.zshrc`
+jellegű shell startup fájlok MCP hostoknál csak akkor megbízható források, ha
+maga a host process is abból a shell sessionből indult. Megbízható beállításhoz
+tedd a `EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_LLM_PROVIDER`, `EASTER_MIND_MAP_MCP_MINDGENIUS_ENV_MINIMAX_API_KEY` és
+kapcsolódó értékeket az MCP host `env` blokkjába, vagy indítsd az MCP hostot
+olyan környezetből, ahol ezek már exportálva vannak.
+
 Ha az upstream még nem fut, az adapter alapértelmezetten a
 `pnpm --dir original-MindGeniusAI dev:server` paranccsal indítja az
 `original-MindGeniusAI` szervert. Ha az `original-MindGeniusAI/node_modules`
 hiányzik, előbb lefuttatja a `pnpm --dir original-MindGeniusAI install
---frozen-lockfile` parancsot. A `MINDGENIUS_START_COMMAND` vagy
-`MINDGENIUS_INSTALL_COMMAND` változót csak akkor írd felül, ha más parancsot
+--frozen-lockfile` parancsot. A `EASTER_MIND_MAP_MCP_MINDGENIUS_START_COMMAND` vagy
+`EASTER_MIND_MAP_MCP_MINDGENIUS_INSTALL_COMMAND` változót csak akkor írd felül, ha más parancsot
 akarsz. Az adapter minden upstream futás előtt ellenőrzi az `/api/health`
 végpontot, és a beállított health timeoutig vár.
 
@@ -85,6 +112,6 @@ pnpm dev:server
 ```
 
 Ezeket a parancsokat csak akkor használd, ha kézzel akarod futtatni az
-upstreamet. A `MINDGENIUS_BASE_URL` arra a szerver URL-re mutasson, amely
+upstreamet. A `EASTER_MIND_MAP_MCP_MINDGENIUS_BASE_URL` arra a szerver URL-re mutasson, amely
 kiszolgálja az `/api/health`, `/api/agent`, `/api/uploadFile` és
 `/api/document/init` végpontokat.

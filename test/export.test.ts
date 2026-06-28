@@ -17,6 +17,9 @@ describe('exports', () => {
   it('exports a PNG resource payload', () => {
     const png = exportPng(outline)
     expect([...png.slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10])
+    const view = new DataView(png.buffer, png.byteOffset, png.byteLength)
+    expect(view.getUint32(8)).toBe(13)
+    expect(new TextDecoder().decode(png.slice(12, 16))).toBe('IHDR')
     expect(png.byteLength).toBeGreaterThan(100)
   })
 })

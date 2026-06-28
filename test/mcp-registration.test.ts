@@ -15,14 +15,20 @@ import type { MindMapService } from '../src/service'
 
 type ToolHandler = (input: Record<string, unknown>) => Promise<unknown>
 type ResourceHandler = (uri: URL) => Promise<unknown>
+type ToolRegistrationOptions = {
+  description?: string
+  inputSchema?: Record<string, { description?: string }>
+}
 
 class FakeRuntimeServer {
   connected = false
   readonly tools = new Map<string, ToolHandler>()
+  readonly toolOptions = new Map<string, unknown>()
   readonly resources: Array<{ name: string; handler: ResourceHandler }> = []
 
-  registerTool(name: string, _options: unknown, handler: any): any {
+  registerTool(name: string, options: unknown, handler: any): any {
     this.tools.set(name, handler as ToolHandler)
+    this.toolOptions.set(name, options)
     return {}
   }
 
@@ -88,10 +94,15 @@ class FakeService {
     return {
       planningId,
       formats,
+      version: 1,
       artifacts: [
-        { format: 'opml', resourceUri: `mindmap://exports/${planningId}/opml`, bytes: 10 },
-        { format: 'png', resourceUri: `mindmap://exports/${planningId}/png`, bytes: 20 },
-        { format: 'markdown', resourceUri: `mindmap://exports/${planningId}/markdown`, bytes: 30 },
+        { format: 'opml', resourceUri: `mindmap://exports/${planningId}/1/opml`, bytes: 10 },
+        { format: 'png', resourceUri: `mindmap://exports/${planningId}/1/png`, bytes: 20 },
+        {
+          format: 'markdown',
+          resourceUri: `mindmap://exports/${planningId}/1/markdown`,
+          bytes: 30,
+        },
       ],
     }
   }
@@ -186,8 +197,8 @@ describe('MCP server registration', () => {
     expect(await fakeServer.resources[2].handler(new URL('mindmap://plans/p1/outline'))).toEqual({
       contents: [{ uri: 'mindmap://plans/p1/outline', mimeType: 'application/json', text: '' }],
     })
-    expect(await fakeServer.resources[5].handler(new URL('mindmap://exports/p1/png'))).toEqual({
-      contents: [{ uri: 'mindmap://exports/p1/png', mimeType: 'image/png', blob: 'AAAA' }],
+    expect(await fakeServer.resources[5].handler(new URL('mindmap://exports/p1/1/png'))).toEqual({
+      contents: [{ uri: 'mindmap://exports/p1/1/png', mimeType: 'image/png', blob: 'AAAA' }],
     })
   })
 
@@ -207,6 +218,21 @@ describe('MCP server registration', () => {
     const fakeServer = new FakeRuntimeServer()
     registerTools(fakeServer, new FakeService() as unknown as MindMapService)
     expect(fakeServer.tools.size).toBe(10)
+    const createOptions = fakeServer.toolOptions.get('mindmap_create') as ToolRegistrationOptions
+    expect(createOptions.description).toContain('Next action')
+    expect(createOptions.inputSchema?.prompt.description).toContain('Required')
+    expect(createOptions.inputSchema?.prompt.description).toContain('user goal')
+    expect(createOptions.inputSchema?.documentId.description).toContain('mindmap_document_index')
+    const statusOptions = fakeServer.toolOptions.get(
+      'mindmap_get_status',
+    ) as ToolRegistrationOptions
+    expect(statusOptions.inputSchema?.planningId.description).toContain('Do not substitute runId')
+    const documentAddOptions = fakeServer.toolOptions.get(
+      'mindmap_document_add',
+    ) as ToolRegistrationOptions
+    expect(documentAddOptions.inputSchema?.source.description).toContain('Local PDF')
+    const exportOptions = fakeServer.toolOptions.get('mindmap_export') as ToolRegistrationOptions
+    expect(exportOptions.inputSchema?.formats.description).toContain('["opml","png"]')
   })
 })
 
@@ -221,8 +247,8 @@ async function textTool(
 
 function makeConfig(dataDir: string) {
   return loadConfig({
-    MINDMAP_DATA_DIR: dataDir,
-    MINDMAP_DOCUMENT_ROOTS: dataDir,
-    MINDMAP_UPSTREAM_URL: 'http://upstream.test',
+    EASTER_MIND_MAP_MCP_MINDMAP_DATA_DIR: dataDir,
+    EASTER_MIND_MAP_MCP_MINDMAP_DOCUMENT_ROOTS: dataDir,
+    EASTER_MIND_MAP_MCP_MINDGENIUS_BASE_URL: 'http://upstream.test',
   })
 }

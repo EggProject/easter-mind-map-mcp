@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import type { ErrorKind } from '@/components/Conversation'
+import { CommandPalette } from '@/components/CommandPalette'
 import { Conversation } from '@/components/Conversation'
 import { SourcesDrawer } from '@/components/SourcesDrawer'
 import { TopBar } from '@/components/TopBar'
@@ -7,6 +8,7 @@ import { Icon } from '@/components/ui/Icon'
 import { docDisplayName, useDocStore } from '@/stores/docStore'
 import { createChatStore } from '@/stores/chatStore'
 import { useNodeStore } from '@/stores/nodeStore'
+import { useSavedMapsStore } from '@/stores/savedMapsStore'
 import { PROVIDERS, useUiStore } from '@/stores/uiStore'
 import { track } from '@/utils/analytics'
 import { extractMarkdownBlock } from '@/utils/convertMarkdown'
@@ -25,9 +27,10 @@ export default function App() {
   const useChat = useMemo(() => createChatStore(), [])
   const { messages, isLoading, send, stop, clear } = useChat()
   const { generateFromMarkdown, reset: resetNodes } = useNodeStore()
+  const nodes = useNodeStore(state => state.nodes)
   const {
     provider, density, leftCollapsed, setLeftCollapsed,
-    sourcesOpen, setSourcesOpen, setSettingsOpen, toast, flash,
+    sourcesOpen, setSourcesOpen, setSettingsOpen, setPaletteOpen, toast, flash,
   } = useUiStore()
   const { files, attached, setAttached, refresh, upload } = useDocStore()
   const t = useT()
@@ -57,6 +60,26 @@ export default function App() {
     return () => window.removeEventListener('resize', onResize)
   }, [setLeftCollapsed])
 
+  /* ⌘K / Ctrl+K 全局唤起命令面板 */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setPaletteOpen(!useUiStore.getState().paletteOpen)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setPaletteOpen])
+
+  /* 当前导图自动快照进画廊（按根 id 去重），debounce 避免编辑过程中频繁写入 */
+  useEffect(() => {
+    if (!nodes)
+      return
+    const timer = setTimeout(() => useSavedMapsStore.getState().upsert(nodes, Date.now()), 800)
+    return () => clearTimeout(timer)
+  }, [nodes])
+
   /* 强保证出图：优先用 mindmap-set 事件直送的 markdown 渲染 */
   const setMapFromMarkdown = (markdown: string) => {
     if (generateFromMarkdown(markdown).ok) {
@@ -80,7 +103,7 @@ export default function App() {
     mapSetThisTurnRef.current = false
     track('agent_run') // 仅计数「有人真正发起了一次生成」，不含任何内容
     setLeftCollapsed(false)
-    const attachedDoc = files.find(file => file.name === attached)
+    const attachedDocs = files.filter(file => attached.includes(file.name))
     send({
       url: '/api/agent',
       data: {
@@ -88,17 +111,19 @@ export default function App() {
           ...messages.filter(item => item.content).map(({ role, content }) => ({ role, content })),
           { role: 'user', content: text },
         ],
-        fileName: attached ?? undefined,
+        fileNames: attached.length ? attached : undefined,
         // 画布已有导图时随请求带上轮廓，Hermas 可据此做增量编辑而非全量重画
         mindMap: useNodeStore.getState().outline() ?? undefined,
+        // 上一轮后用户手动改了哪，告诉 Hermas，让它像协作者一样顺势回应
+        recentEdits: useNodeStore.getState().drainUserEdits(),
       },
       userText: text,
-      userPdf: attachedDoc ? docDisplayName(attachedDoc) : undefined,
+      userPdf: attachedDocs.length ? attachedDocs.map(docDisplayName).join('、') : undefined,
       agentMode: true,
       onDone: applyMarkdown,
       onSetMap: setMapFromMarkdown,
       onPatch: (ops) => {
-        const applied = useNodeStore.getState().patch(ops)
+        const applied = useNodeStore.getState().patch(ops, 'agent')
         if (applied)
           flash(t('toast.mapUpdated', { n: applied }))
       },
@@ -144,6 +169,7 @@ export default function App() {
       className={density === 'compact' ? 'density-compact' : undefined}
       style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
     >
+      <CommandPalette />
       <TopBar />
 
       <div style={{ flex: 1, display: 'flex', minHeight: 0, position: 'relative' }}>
@@ -157,17 +183,17 @@ export default function App() {
               messages={messages}
               working={isLoading}
               providerName={providerName}
-              attached={attached}
+              attachedCount={attached.length}
               attachedDisplay={(() => {
-                const doc = files.find(file => file.name === attached)
-                return doc ? docDisplayName(doc) : undefined
+                const docs = files.filter(file => attached.includes(file.name))
+                return docs.length ? docs.map(docDisplayName).join('、') : undefined
               })()}
               onSend={handleSend}
               onStop={stop}
               onNewChat={handleNewChat}
               onCollapse={() => setLeftCollapsed(true)}
               onAttach={handleAttach}
-              onRemoveAttach={() => setAttached(null)}
+              onRemoveAttach={() => setAttached([])}
               onErrorAction={handleErrorAction}
             />
           </div>

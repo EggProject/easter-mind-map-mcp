@@ -2,11 +2,13 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { loadConfig } from '../config'
-import { FileStore } from '../store'
+import { createLogger, redactForLog } from '../logger'
+import { MemoryStore } from '../store'
 import { MindMapService } from '../service'
 import { HttpUpstreamClient } from '../upstream/client'
 import { toolDescriptions } from './toolDescriptions'
 import type { ServerConfig } from '../config'
+import type { Logger } from '../logger'
 import type { Store } from '../store'
 import type { UpstreamClient } from '../types'
 
@@ -17,20 +19,39 @@ export interface StdioServerOptions {
   service?: MindMapService
   server?: RuntimeServer
   transport?: StdioServerTransport
+  logger?: Logger
 }
 
 export async function startStdioServer(options: StdioServerOptions = {}): Promise<void> {
   const config = options.config ?? loadConfig()
-  const service = options.service ?? createDefaultService(config)
+  const logger = options.logger ?? createLogger(config.logLevel, config.logPath)
+  logger.info('mcp server starting', {
+    dataDir: config.dataDir,
+    logLevel: config.logLevel,
+    logPath: config.logPath,
+    upstreamBaseUrl: config.upstreamBaseUrl,
+  })
+  logger.debug('mcp server config', {
+    allowedDocumentRoots: config.allowedDocumentRoots,
+    concurrency: config.concurrency,
+    upstreamEnv: redactForLog(config.upstreamEnv),
+    upstreamInstallCheckPath: config.upstreamInstallCheckPath,
+    upstreamInstallCommand: config.upstreamInstallCommand,
+    upstreamStartCommand: config.upstreamStartCommand,
+    upstreamWorkingDirectory: config.upstreamWorkingDirectory,
+  })
+  const service = options.service ?? createDefaultService(config, logger)
   const server = options.server ?? createMcpServer()
-  await service.recoverPendingRuns()
+  const recovered = await service.recoverPendingRuns()
+  logger.info('pending runs recovered', { recovered })
   registerTools(server, service)
   registerResources(server, service)
   await server.connect(options.transport ?? createStdioTransport())
+  logger.info('mcp server connected')
 }
 
-export function createDefaultService(config: ServerConfig): MindMapService {
-  const { store, upstream } = makeDefaultComponents(config)
+export function createDefaultService(config: ServerConfig, logger?: Logger): MindMapService {
+  const { store, upstream } = makeDefaultComponents(config, logger)
   return new MindMapService(store, upstream, config)
 }
 
@@ -42,7 +63,7 @@ export function createMcpServer(): McpServer {
     },
     {
       instructions:
-        'This server manages persistent MindGeniusAI mind-map plans. Always call mindmap_create first, preserve returned IDs exactly, poll with mindmap_get_status, fetch result only when needed, and finish with mindmap_export using opml and png.',
+        'This MCP server manages in-memory MindGeniusAI mind-map plans. For a new map, call mindmap_create first, preserve returned planningId/runId/documentId values exactly, poll mindmap_get_status until a terminal status, inspect content only when needed with mindmap_get_result, and finish every successful map with mindmap_export using both opml and png. If a local PDF is needed, call mindmap_document_add, then mindmap_document_index, then mindmap_create with the indexed documentId. Use mindmap_guide whenever the correct tool order is uncertain.',
     },
   )
 }
@@ -51,12 +72,15 @@ export function createStdioTransport(): StdioServerTransport {
   return new StdioServerTransport()
 }
 
-export function makeDefaultComponents(config: ServerConfig): {
+export function makeDefaultComponents(
+  config: ServerConfig,
+  logger?: Logger,
+): {
   store: Store
   upstream: UpstreamClient
 } {
   return {
-    store: new FileStore(config.dataDir),
+    store: new MemoryStore(),
     upstream: new HttpUpstreamClient(
       config.upstreamBaseUrl,
       config.upstreamStartCommand,
@@ -66,6 +90,9 @@ export function makeDefaultComponents(config: ServerConfig): {
       config.upstreamInstallCommand,
       config.upstreamInstallCheckPath,
       config.upstreamEnv,
+      undefined,
+      logger,
+      config.upstreamWorkingDirectory,
     ),
   }
 }
@@ -80,17 +107,36 @@ export function registerTools(
     {
       description: toolDescriptions.mindmap_create,
       inputSchema: {
-        prompt: z.string().min(1).describe('The user goal/topic to turn into a mind map.'),
+        prompt: z
+          .string()
+          .min(1)
+          .describe(
+            'Required. The user goal, topic, or task to turn into a mind map. Pass the user intent directly and keep constraints that affect the map structure.',
+          ),
         documentId: z
           .string()
           .optional()
-          .describe('Previously uploaded and indexed documentId for RAG.'),
-        initialMindMap: z.any().optional().describe('Optional current outline to continue from.'),
+          .describe(
+            'Optional. Exact documentId returned by mindmap_document_add and successfully initialized by mindmap_document_index. Do not invent or edit it.',
+          ),
+        initialMindMap: z
+          .any()
+          .optional()
+          .describe(
+            'Optional. Existing outline object to seed the first run when the caller already has structured mind-map state. Omit for normal new plans.',
+          ),
         idempotencyKey: z
           .string()
           .optional()
-          .describe('Stable caller key that prevents duplicate plans.'),
-        metadata: z.record(z.string()).optional().describe('Small caller metadata, not secrets.'),
+          .describe(
+            'Optional. Stable caller-provided key for retrying the same create request without duplicate plans. Reuse only for the same user intent.',
+          ),
+        metadata: z
+          .record(z.string())
+          .optional()
+          .describe(
+            'Optional. Small non-secret caller metadata for tracing. Do not put API keys, credentials, or large content here.',
+          ),
       },
     },
     async (input) => json(await service.create({ ownerId, ...input })),
@@ -100,15 +146,23 @@ export function registerTools(
     {
       description: toolDescriptions.mindmap_continue,
       inputSchema: {
-        planningId: z.string().describe('Existing planningId returned by mindmap_create.'),
+        planningId: z
+          .string()
+          .describe(
+            'Required. Exact planningId returned by mindmap_create for the plan being refined. Preserve it byte-for-byte.',
+          ),
         instruction: z
           .string()
           .min(1)
-          .describe('New refinement instruction for the existing plan.'),
+          .describe(
+            'Required. User refinement instruction for the existing plan, such as add, remove, reorganize, translate, or expand nodes.',
+          ),
         idempotencyKey: z
           .string()
           .optional()
-          .describe('Stable caller key that prevents duplicate runs.'),
+          .describe(
+            'Optional. Stable caller-provided key for retrying the same refinement without duplicate runs. Reuse only for the same instruction.',
+          ),
       },
     },
     async (input) => json(await service.continue({ ownerId, ...input })),
@@ -118,7 +172,11 @@ export function registerTools(
     {
       description: toolDescriptions.mindmap_get_status,
       inputSchema: {
-        planningId: z.string().describe('Existing planningId to poll.'),
+        planningId: z
+          .string()
+          .describe(
+            'Required. Exact planningId to poll after create or continue. Do not substitute runId or documentId.',
+          ),
       },
     },
     async ({ planningId }) => json(await service.getStatus(ownerId, planningId)),
@@ -128,11 +186,15 @@ export function registerTools(
     {
       description: toolDescriptions.mindmap_get_result,
       inputSchema: {
-        planningId: z.string().describe('Existing planningId to read.'),
+        planningId: z
+          .string()
+          .describe('Required. Exact planningId whose current or completed map should be read.'),
         format: z
           .enum(['outline', 'markdown', 'summary'])
           .optional()
-          .describe('Result representation.'),
+          .describe(
+            'Optional. Choose outline for structured JSON, markdown for readable map text, or summary for a compact status-style answer. Default is summary.',
+          ),
       },
     },
     async ({ planningId, format }) => json(await service.getResult(ownerId, planningId, format)),
@@ -142,7 +204,9 @@ export function registerTools(
     {
       description: toolDescriptions.mindmap_cancel,
       inputSchema: {
-        planningId: z.string().describe('Existing planningId to cancel.'),
+        planningId: z
+          .string()
+          .describe('Required. Exact planningId whose queued or running work should be cancelled.'),
       },
     },
     async ({ planningId }) => json(await service.cancel(ownerId, planningId)),
@@ -160,8 +224,25 @@ export function registerTools(
     {
       description: toolDescriptions.mindmap_document_add,
       inputSchema: {
-        source: z.object({ type: z.literal('local_path'), path: z.string() }),
-        displayName: z.string().optional(),
+        source: z
+          .object({
+            type: z
+              .literal('local_path')
+              .describe('Required. Only local_path is supported; do not pass URLs or inline data.'),
+            path: z
+              .string()
+              .min(1)
+              .describe(
+                'Required. Local PDF path under an allowed document root. Do not pass remote URLs, base64, or secret material.',
+              ),
+          })
+          .describe('Required. Local PDF source descriptor for document upload.'),
+        displayName: z
+          .string()
+          .optional()
+          .describe(
+            'Optional. Human-readable document label for later selection. Omit when the file name is sufficient.',
+          ),
       },
     },
     async (input) => json(await service.documentAdd({ ownerId, ...input })),
@@ -171,7 +252,11 @@ export function registerTools(
     {
       description: toolDescriptions.mindmap_document_index,
       inputSchema: {
-        documentId: z.string(),
+        documentId: z
+          .string()
+          .describe(
+            'Required. Exact documentId returned by mindmap_document_add. Preserve it byte-for-byte and index it before using it in mindmap_create.',
+          ),
       },
     },
     async ({ documentId }) => json(await service.documentIndex(ownerId, documentId)),
@@ -181,8 +266,17 @@ export function registerTools(
     {
       description: toolDescriptions.mindmap_export,
       inputSchema: {
-        planningId: z.string(),
-        formats: z.array(z.enum(['opml', 'png', 'markdown'])).optional(),
+        planningId: z
+          .string()
+          .describe(
+            'Required. Exact planningId for the completed or committed plan version to export.',
+          ),
+        formats: z
+          .array(z.enum(['opml', 'png', 'markdown']))
+          .optional()
+          .describe(
+            'Optional. Export formats to create resource links for. Omit for the required default ["opml","png"]; include markdown only when specifically useful.',
+          ),
       },
     },
     async ({ planningId, formats }) => {
@@ -215,7 +309,7 @@ export function exportToolResult(
         uri: string
         name: string
         title: string
-        size: number
+        size?: number
         mimeType: string
       }
   >
@@ -223,19 +317,21 @@ export function exportToolResult(
   const artifacts = result.artifacts as Array<{
     format: 'opml' | 'png' | 'markdown'
     resourceUri: string
-    bytes: number
+    bytes?: number
   }>
   return {
     content: [
       { type: 'text', text: JSON.stringify(result, null, 2) },
-      ...artifacts.map((artifact) => ({
-        type: 'resource_link' as const,
-        uri: artifact.resourceUri,
-        name: `${planningId}-${artifact.format}`,
-        title: `Mind-map ${artifact.format.toUpperCase()} export`,
-        size: artifact.bytes,
-        mimeType: artifactMimeType(artifact.format),
-      })),
+      ...artifacts.map((artifact) => {
+        const link = {
+          type: 'resource_link' as const,
+          uri: artifact.resourceUri,
+          name: `${planningId}-${artifact.format}`,
+          title: `Mind-map ${artifact.format.toUpperCase()} export`,
+          mimeType: artifactMimeType(artifact.format),
+        }
+        return artifact.bytes === undefined ? link : { ...link, size: artifact.bytes }
+      }),
     ],
   }
 }
@@ -267,7 +363,8 @@ export function registerResources(
     {
       title: 'Mind-map tool flow guide',
       mimeType: 'text/markdown',
-      description: 'AI-readable recipe for using the MindGeniusAI MCP tools.',
+      description:
+        'AI-readable prompt recipe for tool order, ID preservation, polling, document flow, and required OPML+PNG export.',
     },
     read,
   )
@@ -297,7 +394,9 @@ export function registerResources(
   )
   server.registerResource(
     'mindmap_export',
-    new ResourceTemplate('mindmap://exports/{planningId}/{format}', { list: undefined }),
+    new ResourceTemplate('mindmap://exports/{planningId}/{version}/{format}', {
+      list: undefined,
+    }),
     { title: 'Mind-map export artifact' },
     read,
   )
